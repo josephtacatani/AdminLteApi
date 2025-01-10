@@ -50,8 +50,8 @@ services:
     environment:
       DB_HOST: mysql  # Internal hostname for MySQL
       DB_PORT: 3306   # MySQL port
-      DB_USER: myuser
-      DB_PASSWORD: mypassword
+      DB_USER: root
+      DB_PASSWORD: rootpassword
       DB_DATABASE: dental_app
 
 volumes:
