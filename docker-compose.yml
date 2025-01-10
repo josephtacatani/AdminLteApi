@@ -1,0 +1,58 @@
+version: '3.8'
+
+services:
+  # Apache + PHP Service
+  apache-php:
+    image: php:8.2-apache
+    container_name: apache-php
+    ports:
+      - "8080:80"  # Map Apache container port 80 to localhost:8080
+    volumes:
+      - ./htdocs:/var/www/html  # Map the local `htdocs` folder to the container
+    depends_on:
+      - mysql  # Ensure MySQL starts before this service
+
+  # MySQL Database Service
+  mysql:
+    image: mysql:8.0
+    container_name: mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword  # Set the MySQL root password
+      MYSQL_DATABASE: dental_app         # Create a database named `dental_app`
+      MYSQL_USER: myuser                 # Create a MySQL user `myuser`
+      MYSQL_PASSWORD: mypassword         # Set a password for `myuser`
+    volumes:
+      - mysql-data:/var/lib/mysql  # Persist MySQL data locally
+    ports:
+      - "3306:3306"  # Expose MySQL on localhost:3306
+
+  # phpMyAdmin Service
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin
+    container_name: phpmyadmin
+    restart: always
+    ports:
+      - "8081:80"  # Access phpMyAdmin via http://localhost:8081
+    environment:
+      PMA_HOST: mysql  # Connect phpMyAdmin to the MySQL service
+      MYSQL_ROOT_PASSWORD: rootpassword  # MySQL root password for access
+
+  # Node.js Backend API Service
+  nodejs-api:
+    build:
+      context: .  # Build the Node.js app using the Dockerfile in the current directory
+    container_name: nodejs-api
+    ports:
+      - "8082:8082"  # Map Node.js container port 8082 to localhost:8082
+    depends_on:
+      - mysql  # Ensure MySQL starts before this service
+    environment:
+      DB_HOST: mysql  # Internal hostname for MySQL
+      DB_PORT: 3306   # MySQL port
+      DB_USER: myuser
+      DB_PASSWORD: mypassword
+      DB_DATABASE: dental_app
+
+volumes:
+  mysql-data:

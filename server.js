@@ -5,7 +5,7 @@ const cors = require('cors');
 const { swaggerUi, swaggerDocs } = require('./swagger'); // Import swagger configuration
 
 const app = express();
-const port = 3000;
+const port = 8082;
 const moment = require('moment');
 
 // Middleware
@@ -14,11 +14,13 @@ app.use(bodyParser.json());
 
 // MySQL connection
 const db = mysql.createConnection({
-  host: 'localhost',
-  user: 'root',
-  password: '', // Replace with your MySQL password
+  host: 'mysql',  // MySQL is exposed on localhost
+  user: 'root',       // MySQL root user
+  password: 'rootpassword', // Replace with your actual password
   database: 'dental_app',
+  port: 3306          // Default MySQL port
 });
+
 
 db.connect((err) => {
   if (err) {
