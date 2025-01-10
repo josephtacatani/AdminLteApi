@@ -12,6 +12,7 @@ const moment = require('moment');
 app.use(cors());
 app.use(bodyParser.json());
 
+
 // MySQL connection
 const db = mysql.createConnection({
   host: 'mysql',  // MySQL is exposed on localhost
@@ -30,68 +31,145 @@ db.connect((err) => {
   console.log('Connected to MySQL database.');
 });
 
-
+// Get all patients
 app.get('/patients', (req, res) => {
-  db.query('SELECT * FROM patients', (err, results) => {
+  const sql = 'SELECT * FROM patients';
+  db.query(sql, (err, results) => {
     if (err) {
-      res.status(500).send(err);
-    } else {
-      res.json(results);
+      console.error('Database Query Error:', err);
+      return res.status(500).json({ error: 'Database query failed', details: err });
     }
+    res.status(200).json(results);
   });
 });
 
 // Get a specific patient by ID
 app.get('/patients/:id', (req, res) => {
   const { id } = req.params;
-  db.query('SELECT * FROM patients WHERE id = ?', [id], (err, results) => {
+  const sql = 'SELECT * FROM patients WHERE id = ?';
+  db.query(sql, [id], (err, results) => {
     if (err) {
-      res.status(500).send(err);
-    } else {
-      res.json(results[0]);
+      console.error('Database Query Error:', err);
+      return res.status(500).json({ error: 'Database query failed', details: err });
     }
+    if (results.length === 0) {
+      return res.status(404).json({ error: 'Patient not found' });
+    }
+    res.status(200).json(results[0]);
   });
 });
 
 // Add a new patient
 app.post('/patients', (req, res) => {
-  const { patientId, photo, name, birthday, gender, contact, email, address } = req.body;
-  const sql = 'INSERT INTO patients (patientId, photo, name, birthday, gender, contact, email, address) VALUES (?, ?, ?, ?, ?, ?, ?, ?)';
-  db.query(sql, [patientId, photo, name, birthday, gender, contact, email, address], (err, result) => {
-    if (err) {
-      res.status(500).send(err);
-    } else {
-      res.json({ id: result.insertId, patientId, photo, name, birthday, gender, contact, email, address });
+  const {
+    firstName,
+    lastName,
+    dateOfBirth,
+    gender,
+    email,
+    mobileNumber,
+    address,
+    profilePicture
+  } = req.body;
+
+  const sql = `
+    INSERT INTO patients (
+      firstName,
+      lastName,
+      dateOfBirth,
+      gender,
+      email,
+      mobileNumber,
+      address,
+      profilePicture
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `;
+
+  db.query(
+    sql,
+    [firstName, lastName, dateOfBirth, gender, email, mobileNumber, address, profilePicture],
+    (err, result) => {
+      if (err) {
+        console.error('Database Insertion Error:', err);
+        return res.status(500).json({ error: 'Failed to add patient', details: err });
+      }
+
+      res.status(201).json({
+        id: result.insertId,
+        firstName,
+        lastName,
+        dateOfBirth,
+        gender,
+        email,
+        mobileNumber,
+        address,
+        profilePicture
+      });
     }
-  });
+  );
 });
 
 // Update a patient
 app.put('/patients/:id', (req, res) => {
   const { id } = req.params;
-  const { patientId, photo, name, birthday, gender, contact, email, address } = req.body;
-  const sql = 'UPDATE patients SET patientId = ?, photo = ?, name = ?, birthday = ?, gender = ?, contact = ?, email = ?, address = ? WHERE id = ?';
-  db.query(sql, [patientId, photo, name, birthday, gender, contact, email, address, id], (err) => {
-    if (err) {
-      res.status(500).send(err);
-    } else {
-      res.json({ message: 'Patient updated successfully.' });
+  const {
+    firstName,
+    lastName,
+    dateOfBirth,
+    gender,
+    email,
+    mobileNumber,
+    address,
+    profilePicture
+  } = req.body;
+
+  const sql = `
+    UPDATE patients
+    SET
+      firstName = ?,
+      lastName = ?,
+      dateOfBirth = ?,
+      gender = ?,
+      email = ?,
+      mobileNumber = ?,
+      address = ?,
+      profilePicture = ?
+    WHERE id = ?
+  `;
+
+  db.query(
+    sql,
+    [firstName, lastName, dateOfBirth, gender, email, mobileNumber, address, profilePicture, id],
+    (err, result) => {
+      if (err) {
+        console.error('Database Update Error:', err);
+        return res.status(500).json({ error: 'Failed to update patient', details: err });
+      }
+      if (result.affectedRows === 0) {
+        return res.status(404).json({ error: 'Patient not found' });
+      }
+      res.status(200).json({ message: 'Patient updated successfully' });
     }
-  });
+  );
 });
 
 // Delete a patient
 app.delete('/patients/:id', (req, res) => {
   const { id } = req.params;
-  db.query('DELETE FROM patients WHERE id = ?', [id], (err) => {
+  const sql = 'DELETE FROM patients WHERE id = ?';
+
+  db.query(sql, [id], (err, result) => {
     if (err) {
-      res.status(500).send(err);
-    } else {
-      res.json({ message: 'Patient deleted successfully.' });
+      console.error('Database Deletion Error:', err);
+      return res.status(500).json({ error: 'Failed to delete patient', details: err });
     }
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: 'Patient not found' });
+    }
+    res.status(200).json({ message: 'Patient deleted successfully' });
   });
 });
-
 // ===== APPOINTMENTS ENDPOINTS =====
 
 // Get all appointments

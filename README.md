@@ -84,3 +84,5 @@ Command	Effect	When to Use
 <docker-compose stop>	Stops the containers but leaves them intact.	To temporarily stop services without losing data or configuration.
 <docker-compose up -d>	Starts containers in detached mode, using existing images.	To restart the application quickly when no changes are made to the Dockerfile or code.
 <docker-compose up --build>	Rebuilds images and starts containers.	After changes to the Dockerfile, dependencies, or application code to ensure updated containers.
+
+<docker-compose restart nodejs-api> ug naay new code changes
