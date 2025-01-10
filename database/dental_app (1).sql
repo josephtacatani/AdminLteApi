@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: mysql
--- Generation Time: Jan 10, 2025 at 07:47 AM
+-- Generation Time: Jan 10, 2025 at 02:34 PM
 -- Server version: 8.0.40
 -- PHP Version: 8.2.8
 
@@ -83,17 +83,22 @@ CREATE TABLE `medical_histories` (
 
 CREATE TABLE `patients` (
   `id` int NOT NULL,
-  `patientId` varchar(50) NOT NULL,
-  `photo` varchar(255) DEFAULT NULL,
-  `name` varchar(100) NOT NULL,
-  `birthday` date NOT NULL,
-  `gender` enum('Male','Female','Other') NOT NULL,
-  `contact` varchar(15) NOT NULL,
+  `firstName` varchar(50) NOT NULL,
+  `lastName` varchar(50) NOT NULL,
+  `dateOfBirth` date NOT NULL,
+  `gender` enum('Male','Female') NOT NULL,
   `email` varchar(100) NOT NULL,
-  `address` text NOT NULL,
-  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
-  `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+  `mobileNumber` varchar(15) NOT NULL,
+  `address` text,
+  `profilePicture` varchar(255) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+--
+-- Dumping data for table `patients`
+--
+
+INSERT INTO `patients` (`id`, `firstName`, `lastName`, `dateOfBirth`, `gender`, `email`, `mobileNumber`, `address`, `profilePicture`) VALUES
+(1, 'John', 'Doe', '1990-01-01', 'Male', 'john.doe@example.com', '1234567890', '123 Main Street, City, Country', 'http://example.com/profile.jpg');
 
 -- --------------------------------------------------------
 
@@ -184,7 +189,6 @@ ALTER TABLE `medical_histories`
 --
 ALTER TABLE `patients`
   ADD PRIMARY KEY (`id`),
-  ADD UNIQUE KEY `patientId` (`patientId`),
   ADD UNIQUE KEY `email` (`email`);
 
 --
@@ -233,7 +237,7 @@ ALTER TABLE `medical_histories`
 -- AUTO_INCREMENT for table `patients`
 --
 ALTER TABLE `patients`
-  MODIFY `id` int NOT NULL AUTO_INCREMENT;
+  MODIFY `id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
 
 --
 -- AUTO_INCREMENT for table `prescriptions`
