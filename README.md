@@ -86,3 +86,7 @@ Command	Effect	When to Use
 <docker-compose up --build>	Rebuilds images and starts containers.	After changes to the Dockerfile, dependencies, or application code to ensure updated containers.
 
 <docker-compose restart nodejs-api> ug naay new code changes
+
+
+npm install dotenv
+

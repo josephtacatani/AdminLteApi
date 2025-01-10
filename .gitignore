@@ -1,10 +1,19 @@
-# Node modules
-/node_modules/
+# Node.js dependencies
+node_modules/
+
+# Environment variables
+.env
 
 # Logs
-npm-debug.log
-yarn-error.log
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
 
 # IDE settings
-.idea/
 .vscode/
+*.iml
+
+# Build files
+dist/

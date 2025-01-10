@@ -14,12 +14,13 @@ app.use(bodyParser.json());
 
 
 // MySQL connection
+require('dotenv').config();
+
 const db = mysql.createConnection({
-  host: 'mysql',  // MySQL is exposed on localhost
-  user: 'root',       // MySQL root user
-  password: 'rootpassword', // Replace with your actual password
-  database: 'dental_app',
-  port: 3306          // Default MySQL port
+  host: process.env.DB_HOST,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_NAME,
 });
 
 
