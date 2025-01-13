@@ -18,6 +18,7 @@ const usersRoutes = require('./routes/users');
 const authRoutes = require('./routes/auth');
 const profileRoutes = require('./routes/profile');
 const serviceListRoutes = require('./routes/serviceslist');
+const dentistRoutes = require('./routes/dentist');
 
 // Middleware
 app.use(cors({
@@ -42,6 +43,7 @@ app.use('/users', usersRoutes);
 app.use('/auth', authRoutes);
 app.use('/profile', profileRoutes);
 app.use('/serviceslist', serviceListRoutes);
+app.use('/dentist', dentistRoutes);
 
 // Start server
 app.listen(port, () => {

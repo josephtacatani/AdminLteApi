@@ -16,7 +16,7 @@
  *                 example: user@example.com
  *               password:
  *                 type: string
- *                 example: securePassword123
+ *                 example: Password123!
  *     responses:
  *       200:
  *         description: Login successful

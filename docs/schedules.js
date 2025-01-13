@@ -9,28 +9,40 @@
  *   schemas:
  *     Schedule:
  *       type: object
+ *       required:
+ *         - dentist_id
+ *         - date
+ *         - start_time
+ *         - end_time
  *       properties:
- *         id:
- *           type: integer
- *           description: Unique identifier for the schedule
- *           example: 1
+
  *         dentist_id:
  *           type: integer
- *           description: ID of the dentist
+ *           description: The ID of the dentist associated with the schedule
  *           example: 2
- *         patient_id:
- *           type: integer
- *           description: ID of the patient
- *           example: 3
- *         appointment_date:
+ *         date:
  *           type: string
- *           format: date-time
- *           description: Date and time of the appointment
- *           example: 2025-01-15T09:00:00Z
- *         timeslot_id:
- *           type: integer
- *           description: Timeslot ID for the appointment
- *           example: 4
+ *           format: date
+ *           description: The date of the schedule
+ *           example: 2025-01-14
+ *         start_time:
+ *           type: string
+ *           format: time
+ *           description: The start time of the schedule
+ *           example: 09:00:00
+ *         end_time:
+ *           type: string
+ *           format: time
+ *           description: The end time of the schedule
+ *           example: 10:00:00
+ *         created_at:
+ *           type: string
+ *           format: datetime
+ *           description: The timestamp when the schedule was created
+ *         updated_at:
+ *           type: string
+ *           format: datetime
+ *           description: The timestamp when the schedule was last updated
  */
 
 /**
@@ -45,7 +57,6 @@
  * /schedules:
  *   get:
  *     summary: Get all schedules
- *     description: Retrieve a list of all schedules. Only accessible by admins and dentists.
  *     tags: [Schedules]
  *     security:
  *       - bearerAuth: []
@@ -59,9 +70,9 @@
  *               items:
  *                 $ref: '#/components/schemas/Schedule'
  *       401:
- *         description: Unauthorized - Token is missing or invalid
- *       403:
- *         description: Forbidden - Insufficient privileges
+ *         description: Unauthorized
+ *       500:
+ *         description: Server error
  */
 
 /**
@@ -69,7 +80,6 @@
  * /schedules/{id}:
  *   get:
  *     summary: Get a specific schedule by ID
- *     description: Retrieve a single schedule by its ID. Only accessible by admins and dentists.
  *     tags: [Schedules]
  *     security:
  *       - bearerAuth: []
@@ -82,17 +92,17 @@
  *         description: The ID of the schedule
  *     responses:
  *       200:
- *         description: Schedule retrieved successfully
+ *         description: The requested schedule
  *         content:
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/Schedule'
+ *       401:
+ *         description: Unauthorized
  *       404:
  *         description: Schedule not found
- *       401:
- *         description: Unauthorized - Token is missing or invalid
- *       403:
- *         description: Forbidden - Insufficient privileges
+ *       500:
+ *         description: Server error
  */
 
 /**
@@ -100,7 +110,6 @@
  * /schedules:
  *   post:
  *     summary: Create a new schedule
- *     description: Create a new schedule. Only accessible by admins.
  *     tags: [Schedules]
  *     security:
  *       - bearerAuth: []
@@ -109,25 +118,7 @@
  *       content:
  *         application/json:
  *           schema:
- *             type: object
- *             properties:
- *               dentist_id:
- *                 type: integer
- *                 description: The ID of the dentist
- *                 example: 2
- *               patient_id:
- *                 type: integer
- *                 description: The ID of the patient
- *                 example: 3
- *               appointment_date:
- *                 type: string
- *                 format: date-time
- *                 description: Date and time of the appointment
- *                 example: 2025-01-15T09:00:00Z
- *               timeslot_id:
- *                 type: integer
- *                 description: The ID of the timeslot
- *                 example: 4
+ *             $ref: '#/components/schemas/Schedule'
  *     responses:
  *       201:
  *         description: Schedule created successfully
@@ -136,17 +127,18 @@
  *             schema:
  *               $ref: '#/components/schemas/Schedule'
  *       401:
- *         description: Unauthorized - Token is missing or invalid
+ *         description: Unauthorized
  *       403:
- *         description: Forbidden - Insufficient privileges
+ *         description: Forbidden
+ *       500:
+ *         description: Server error
  */
 
 /**
  * @swagger
  * /schedules/{id}:
  *   put:
- *     summary: Update a schedule
- *     description: Update an existing schedule by ID. Only accessible by admins.
+ *     summary: Update an existing schedule
  *     tags: [Schedules]
  *     security:
  *       - bearerAuth: []
@@ -162,34 +154,18 @@
  *       content:
  *         application/json:
  *           schema:
- *             type: object
- *             properties:
- *               dentist_id:
- *                 type: integer
- *                 description: The ID of the dentist
- *                 example: 2
- *               patient_id:
- *                 type: integer
- *                 description: The ID of the patient
- *                 example: 3
- *               appointment_date:
- *                 type: string
- *                 format: date-time
- *                 description: Date and time of the appointment
- *                 example: 2025-01-15T09:00:00Z
- *               timeslot_id:
- *                 type: integer
- *                 description: The ID of the timeslot
- *                 example: 4
+ *             $ref: '#/components/schemas/Schedule'
  *     responses:
  *       200:
  *         description: Schedule updated successfully
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden
  *       404:
  *         description: Schedule not found
- *       401:
- *         description: Unauthorized - Token is missing or invalid
- *       403:
- *         description: Forbidden - Insufficient privileges
+ *       500:
+ *         description: Server error
  */
 
 /**
@@ -197,7 +173,6 @@
  * /schedules/{id}:
  *   delete:
  *     summary: Delete a schedule
- *     description: Delete an existing schedule by ID. Only accessible by admins.
  *     tags: [Schedules]
  *     security:
  *       - bearerAuth: []
@@ -211,10 +186,12 @@
  *     responses:
  *       204:
  *         description: Schedule deleted successfully
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden
  *       404:
  *         description: Schedule not found
- *       401:
- *         description: Unauthorized - Token is missing or invalid
- *       403:
- *         description: Forbidden - Insufficient privileges
+ *       500:
+ *         description: Server error
  */
