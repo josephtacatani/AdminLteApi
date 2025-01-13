@@ -1,69 +1,141 @@
 /**
  * @swagger
- * components:
- *   schemas:
- *     Appointment:
- *       type: object
- *       properties:
- *         id:
- *           type: integer
- *           description: Unique identifier for the appointment
- *         patientId:
- *           type: integer
- *           description: Corresponding patient's ID
- *         date:
- *           type: string
- *           format: date
- *           description: Appointment date
- *         time:
- *           type: string
- *           description: Appointment time
- *         doctor:
- *           type: string
- *           description: Doctor's name
- *         status:
- *           type: string
- *           description: Appointment status (e.g., Confirmed, Pending)
- *       required:
- *         - patientId
- *         - date
- *         - time
- *         - doctor
- *         - status
- */
-
-/**
- * @swagger
- * /appointments:
- *   get:
- *     summary: Get all appointments
- *     responses:
- *       200:
- *         description: List of all appointments
- *         content:
- *           application/json:
- *             schema:
- *               type: array
- *               items:
- *                 $ref: '#/components/schemas/Appointment'
+ * tags:
+ *   name: Appointments
+ *   description: Appointment management endpoints
  */
 
 /**
  * @swagger
  * /appointments:
  *   post:
- *     summary: Add a new appointment
+ *     summary: Create a new appointment
+ *     tags: [Appointments]
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
- *             $ref: '#/components/schemas/Appointment'
+ *             type: object
+ *             properties:
+ *               patient_id:
+ *                 type: integer
+ *                 description: ID of the patient
+ *               dentist_id:
+ *                 type: integer
+ *                 description: ID of the dentist
+ *               appointment_date:
+ *                 type: string
+ *                 format: date-time
+ *                 description: Date and time of the appointment
+ *               timeslot_id:
+ *                 type: integer
+ *                 description: ID of the timeslot
+ *               service_list_id:
+ *                 type: integer
+ *                 description: ID of the service
+ *             required:
+ *               - patient_id
+ *               - dentist_id
+ *               - appointment_date
+ *               - timeslot_id
+ *               - service_list_id
  *     responses:
  *       201:
  *         description: Appointment created successfully
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Appointment'
+ */
+
+/**
+ * @swagger
+ * /appointments:
+ *   get:
+ *     summary: Retrieve all appointments
+ *     tags: [Appointments]
+ *     responses:
+ *       200:
+ *         description: List of appointments retrieved successfully
+ */
+
+/**
+ * @swagger
+ * /appointments/{id}:
+ *   get:
+ *     summary: Retrieve an appointment by ID
+ *     tags: [Appointments]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         schema:
+ *           type: integer
+ *         required: true
+ *         description: ID of the appointment
+ *     responses:
+ *       200:
+ *         description: Appointment retrieved successfully
+ *       404:
+ *         description: Appointment not found
+ */
+
+/**
+ * @swagger
+ * /appointments/{id}:
+ *   put:
+ *     summary: Update an appointment
+ *     tags: [Appointments]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         schema:
+ *           type: integer
+ *         required: true
+ *         description: ID of the appointment
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               patient_id:
+ *                 type: integer
+ *               dentist_id:
+ *                 type: integer
+ *               appointment_date:
+ *                 type: string
+ *                 format: date-time
+ *               timeslot_id:
+ *                 type: integer
+ *               service_list_id:
+ *                 type: integer
+ *             required:
+ *               - patient_id
+ *               - dentist_id
+ *               - appointment_date
+ *               - timeslot_id
+ *               - service_list_id
+ *     responses:
+ *       200:
+ *         description: Appointment updated successfully
+ *       404:
+ *         description: Appointment not found
+ */
+
+/**
+ * @swagger
+ * /appointments/{id}:
+ *   delete:
+ *     summary: Delete an appointment
+ *     tags: [Appointments]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         schema:
+ *           type: integer
+ *         required: true
+ *         description: ID of the appointment
+ *     responses:
+ *       204:
+ *         description: Appointment deleted successfully
+ *       404:
+ *         description: Appointment not found
  */
