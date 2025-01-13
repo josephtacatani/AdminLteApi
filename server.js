@@ -17,6 +17,7 @@ const treatmentsRoutes = require('./routes/treatments');
 const usersRoutes = require('./routes/users');
 const authRoutes = require('./routes/auth');
 const profileRoutes = require('./routes/profile');
+const serviceListRoutes = require('./routes/serviceslist');
 
 // Middleware
 app.use(cors({
@@ -40,6 +41,7 @@ app.use('/schedules', schedulesRoutes);
 app.use('/users', usersRoutes);
 app.use('/auth', authRoutes);
 app.use('/profile', profileRoutes);
+app.use('/serviceslist', serviceListRoutes);
 
 // Start server
 app.listen(port, () => {

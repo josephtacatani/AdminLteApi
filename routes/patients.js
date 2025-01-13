@@ -1,185 +1,96 @@
 const express = require('express');
-const router = express.Router();
 const bcrypt = require('bcrypt');
-const db = require('../db'); // Centralized database connection
+const db = require('../db');
+const router = express.Router();
 
-// Get All Patients
-router.get('/', (req, res) => {
-  const sql = 'SELECT id, firstName, lastName, dateOfBirth, gender, email, mobileNumber, address, profilePicture FROM patients';
-  db.query(sql, (err, results) => {
-    if (err) {
-      console.error('Database Query Error:', err);
-      return res.status(500).json({ error: 'Database query failed' });
+router.post('/register', async (req, res) => {
+    const { email, password, fullname, address, gender, birthday, contact_number } = req.body;
+
+    if (!email || !password || !fullname || !address || !gender || !birthday || !contact_number) {
+        return res.status(400).json({ message: 'All fields are required.' });
     }
-    res.status(200).json(results);
-  });
+
+    try {
+        const hashedPassword = await bcrypt.hash(password, 10);
+        const sql = `
+            INSERT INTO patients (email, password, fullname, address, gender, birthday, contact_number, email_verified)
+            VALUES (?, ?, ?, ?, ?, ?, ?, 0)
+        `;
+
+        db.query(
+            sql,
+            [email, hashedPassword, fullname, address, gender, birthday, contact_number],
+            (err, results) => {
+                if (err) return res.status(500).json({ message: 'Registration failed.', error: err.message });
+
+                res.status(201).json({
+                    message: 'Registration successful. Please verify your email.',
+                    data: { id: results.insertId, email, fullname, address, gender, birthday, contact_number },
+                });
+            }
+        );
+    } catch (error) {
+        res.status(500).json({ message: 'An error occurred during registration.', error: error.message });
+    }
 });
 
-// Get a Specific Patient by ID
-router.get('/:id', (req, res) => {
-  const { id } = req.params;
-  const sql = 'SELECT id, firstName, lastName, dateOfBirth, gender, email, mobileNumber, address, profilePicture FROM patients WHERE id = ?';
-  db.query(sql, [id], (err, results) => {
-    if (err) {
-      console.error('Database Query Error:', err);
-      return res.status(500).json({ error: 'Database query failed' });
-    }
-    if (results.length === 0) {
-      return res.status(404).json({ error: 'Patient not found' });
-    }
-    res.status(200).json(results[0]);
-  });
-});
+router.post('/appointments', (req, res) => {
+  const { patient_id, dentist_id, appointment_date, timeslot_id, service_list_id } = req.body;
 
-// Add a New Patient
-router.post('/', async (req, res) => {
-  const {
-    firstName,
-    lastName,
-    dateOfBirth,
-    gender,
-    email,
-    mobileNumber,
-    address,
-    profilePicture,
-    password,
-  } = req.body;
-
-  try {
-    // Hash the password
-    const saltRounds = 10;
-    const passwordHash = await bcrypt.hash(password, saltRounds);
-
-    const sql = `
-      INSERT INTO patients (firstName, lastName, dateOfBirth, gender, email, mobileNumber, address, profilePicture, password_hash)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `;
-    db.query(
-      sql,
-      [firstName, lastName, dateOfBirth, gender, email, mobileNumber, address, profilePicture, passwordHash],
-      (err, result) => {
-        if (err) {
-          console.error('Database Insertion Error:', err);
-          return res.status(500).json({ error: 'Failed to add patient', details: err });
-        }
-        res.status(201).json({
-          id: result.insertId,
-          firstName,
-          lastName,
-          dateOfBirth,
-          gender,
-          email,
-          mobileNumber,
-          address,
-          profilePicture,
-        });
-      }
-    );
-  } catch (error) {
-    console.error('Error hashing password:', error);
-    res.status(500).json({ error: 'Failed to process the request' });
+  if (!patient_id || !dentist_id || !appointment_date || !timeslot_id || !service_list_id) {
+      return res.status(400).json({ message: 'All fields are required.' });
   }
-});
-
-// Update a Patient
-router.put('/:id', (req, res) => {
-  const { id } = req.params;
-  const {
-    firstName,
-    lastName,
-    dateOfBirth,
-    gender,
-    email,
-    mobileNumber,
-    address,
-    profilePicture,
-  } = req.body;
 
   const sql = `
-    UPDATE patients
-    SET firstName = ?, lastName = ?, dateOfBirth = ?, gender = ?, email = ?, mobileNumber = ?, address = ?, profilePicture = ?
-    WHERE id = ?
+      INSERT INTO appointments (patient_id, dentist_id, appointment_date, timeslot_id, service_list_id)
+      VALUES (?, ?, ?, ?, ?)
   `;
+
   db.query(
-    sql,
-    [firstName, lastName, dateOfBirth, gender, email, mobileNumber, address, profilePicture, id],
-    (err, result) => {
-      if (err) {
-        console.error('Database Update Error:', err);
-        return res.status(500).json({ error: 'Failed to update patient', details: err });
+      sql,
+      [patient_id, dentist_id, appointment_date, timeslot_id, service_list_id],
+      (err, results) => {
+          if (err) return res.status(500).json({ message: 'Failed to book appointment.', error: err.message });
+
+          res.status(201).json({ message: 'Appointment booked successfully.', appointment_id: results.insertId });
       }
-      if (result.affectedRows === 0) {
-        return res.status(404).json({ error: 'Patient not found' });
-      }
-      res.status(200).json({ message: 'Patient updated successfully' });
-    }
   );
 });
 
-// Update Patient Password
-router.put('/:id/password', async (req, res) => {
-  const { id } = req.params;
-  const { oldPassword, newPassword } = req.body;
+router.get('/appointments/:patient_id', (req, res) => {
+  const { patient_id } = req.params;
 
-  if (!oldPassword || !newPassword) {
-    return res.status(400).json({ error: 'Both old and new passwords are required' });
-  }
+  if (!patient_id) return res.status(400).json({ message: 'Patient ID is required.' });
 
-  try {
-    // Fetch the current password hash from the database
-    const sqlSelect = 'SELECT password_hash FROM patients WHERE id = ?';
-    db.query(sqlSelect, [id], async (err, results) => {
-      if (err) {
-        console.error('Database Query Error:', err);
-        return res.status(500).json({ error: 'Database query failed' });
-      }
+  const sql = `
+      SELECT * FROM appointments
+      WHERE patient_id = ?
+  `;
 
-      if (results.length === 0) {
-        return res.status(404).json({ error: 'Patient not found' });
-      }
+  db.query(sql, [patient_id], (err, results) => {
+      if (err) return res.status(500).json({ message: 'Failed to retrieve appointments.', error: err.message });
 
-      const { password_hash } = results[0];
-
-      // Verify the old password
-      const isMatch = await bcrypt.compare(oldPassword, password_hash);
-      if (!isMatch) {
-        return res.status(401).json({ error: 'Old password is incorrect' });
-      }
-
-      // Hash the new password
-      const saltRounds = 10;
-      const newPasswordHash = await bcrypt.hash(newPassword, saltRounds);
-
-      // Update the password in the database
-      const sqlUpdate = 'UPDATE patients SET password_hash = ? WHERE id = ?';
-      db.query(sqlUpdate, [newPasswordHash, id], (err, result) => {
-        if (err) {
-          console.error('Database Update Error:', err);
-          return res.status(500).json({ error: 'Failed to update password', details: err });
-        }
-        res.status(200).json({ message: 'Password updated successfully' });
-      });
-    });
-  } catch (error) {
-    console.error('Error processing password update:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-// Delete a Patient
-router.delete('/:id', (req, res) => {
-  const { id } = req.params;
-  const sql = 'DELETE FROM patients WHERE id = ?';
-  db.query(sql, [id], (err, result) => {
-    if (err) {
-      console.error('Database Deletion Error:', err);
-      return res.status(500).json({ error: 'Failed to delete patient', details: err });
-    }
-    if (result.affectedRows === 0) {
-      return res.status(404).json({ error: 'Patient not found' });
-    }
-    res.status(200).json({ message: 'Patient deleted successfully' });
+      res.status(200).json({ message: 'Appointments retrieved successfully.', data: results });
   });
 });
+
+router.get('/histories/:patient_id', (req, res) => {
+  const { patient_id } = req.params;
+
+  if (!patient_id) return res.status(400).json({ message: 'Patient ID is required.' });
+
+  const sql = `
+      SELECT dental_histories, medical_histories
+      FROM patients
+      WHERE id = ?
+  `;
+
+  db.query(sql, [patient_id], (err, results) => {
+      if (err) return res.status(500).json({ message: 'Failed to retrieve histories.', error: err.message });
+
+      res.status(200).json({ message: 'Histories retrieved successfully.', data: results[0] });
+  });
+});
+
 
 module.exports = router;

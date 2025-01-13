@@ -34,4 +34,12 @@ const verifyToken = (req, res, next) => {
   });
 };
 
-module.exports = { generateAccessToken, generateRefreshToken, verifyToken };
+// Middleware to Verify Roles
+const verifyRole = (...allowedRoles) => (req, res, next) => {
+  if (!allowedRoles.includes(req.user.role)) {
+    return res.status(403).json({ message: 'Access forbidden: Insufficient role privileges' });
+  }
+  next();
+};
+
+module.exports = { generateAccessToken, generateRefreshToken, verifyToken, verifyRole };
