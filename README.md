@@ -73,10 +73,11 @@ docker stop $(docker ps -q)
 
 
 
-remove
+if issue sa database pero feel nimo okay ra
 
-docker rm -f $(docker ps -aq)
-
+<docker rm -f $(docker ps -aq)>
+<docker-compose down>
+<docker-compose up -d>
 
 
 Command	Effect	When to Use
@@ -88,5 +89,5 @@ Command	Effect	When to Use
 <docker-compose restart nodejs-api> ug naay new code changes
 
 
-npm install dotenv
 
+   npm install bcrypt

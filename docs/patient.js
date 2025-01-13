@@ -11,6 +11,7 @@
  *         - gender
  *         - email
  *         - mobileNumber
+ *         - password
  *       properties:
  *         id:
  *           type: integer
@@ -42,6 +43,9 @@
  *         profilePicture:
  *           type: string
  *           description: URL of the patient's profile picture
+ *         password:
+ *           type: string
+ *           description: Patient's password (hashed on the backend)
  *       example:
  *         id: 1
  *         firstName: John
@@ -52,6 +56,7 @@
  *         mobileNumber: 1234567890
  *         address: 123 Main Street, City, Country
  *         profilePicture: http://example.com/profile.jpg
+ *         password: examplePassword123
  */
 
 /**
@@ -81,6 +86,7 @@
  *                   type: string
  *                   description: Error message
  */
+
 /**
  * @swagger
  * /patients/{id}:
@@ -123,6 +129,7 @@
  *                   type: string
  *                   description: Error message
  */
+
 /**
  * @swagger
  * /patients:
@@ -154,6 +161,7 @@
  *                   type: string
  *                   description: Error message
  */
+
 /**
  * @swagger
  * /patients/{id}:
@@ -206,6 +214,93 @@
  *                   type: string
  *                   description: Error message
  */
+
+/**
+ * @swagger
+ * /patients/{id}/password:
+ *   put:
+ *     summary: Update a patient's password
+ *     tags:
+ *       - Patients
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: The ID of the patient
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - oldPassword
+ *               - newPassword
+ *             properties:
+ *               oldPassword:
+ *                 type: string
+ *                 description: The patient's current password
+ *               newPassword:
+ *                 type: string
+ *                 description: The patient's new password
+ *             example:
+ *               oldPassword: oldPassword123
+ *               newPassword: newSecurePassword123
+ *     responses:
+ *       200:
+ *         description: Password updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Password updated successfully
+ *       400:
+ *         description: Bad request (e.g., missing fields)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: Missing required fields
+ *       401:
+ *         description: Unauthorized (e.g., old password incorrect)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: Old password is incorrect
+ *       404:
+ *         description: Patient not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: Patient not found
+ *       500:
+ *         description: Failed to update password
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: Internal server error
+ */
+
 /**
  * @swagger
  * /patients/{id}:
