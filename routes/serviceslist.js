@@ -1,6 +1,6 @@
 const express = require('express');
 const db = require('../db');
-const { verifyToken } = require('../middlewares/auth');
+const { verifyToken, verifyRole } = require('../middlewares/auth');
 const router = express.Router();
 
 /**
@@ -33,7 +33,7 @@ router.get('/:id', verifyToken, (req, res) => {
 /**
  * Create a new service
  */
-router.post('/', verifyToken, (req, res) => {
+router.post('/', verifyToken, verifyRole('admin'), (req, res) => {
   const { service_name, title, content, photo } = req.body;
 
   const sql = 'INSERT INTO serviceslist (service_name, title, content, photo) VALUES (?, ?, ?, ?)';
@@ -51,7 +51,7 @@ router.post('/', verifyToken, (req, res) => {
 /**
  * Update a service
  */
-router.put('/:id', verifyToken, (req, res) => {
+router.put('/:id', verifyToken, verifyRole('admin'), (req, res) => {
   const { id } = req.params;
   const { service_name, title, content, photo } = req.body;
 
@@ -69,7 +69,7 @@ router.put('/:id', verifyToken, (req, res) => {
 /**
  * Delete a service
  */
-router.delete('/:id', verifyToken, (req, res) => {
+router.delete('/:id', verifyToken, verifyRole('admin'), (req, res) => {
   const { id } = req.params;
 
   db.query('DELETE FROM serviceslist WHERE id = ?', [id], (err, results) => {

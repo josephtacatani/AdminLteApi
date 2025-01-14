@@ -2,80 +2,72 @@
  * @swagger
  * components:
  *   schemas:
- *     Prescription:
+ *     DentalHistory:
  *       type: object
  *       properties:
  *         id:
  *           type: integer
- *           description: Unique identifier for the prescription (auto-generated)
+ *           description: Unique identifier for the dental history (auto-generated)
  *           example: 1
  *         patient_id:
  *           type: integer
  *           description: ID of the patient
  *           example: 5
- *         dentist_id:
- *           type: integer
- *           description: ID of the dentist
- *           example: 2
- *         date:
+ *         previous_dentist:
+ *           type: string
+ *           description: Name of the previous dentist
+ *           example: "Dr. Jane Doe"
+ *         last_dentist_visit:
  *           type: string
  *           format: date
- *           description: Date of the prescription
- *           example: "2025-01-14"
- *         medicine:
- *           type: string
- *           description: List of medicines prescribed
- *           example: "Amoxicillin 500mg, Paracetamol 650mg"
- *         notes:
- *           type: string
- *           description: Additional notes or instructions
- *           example: "Take medications after meals."
+ *           description: Date of the last visit to the dentist
+ *           example: "2025-01-01"
  *         created_at:
  *           type: string
  *           format: date-time
  *           description: Record creation timestamp
- *           example: "2025-01-14T12:00:00Z"
+ *           example: "2025-01-01T12:00:00Z"
  *         updated_at:
  *           type: string
  *           format: date-time
  *           description: Record last update timestamp
- *           example: "2025-01-14T12:00:00Z"
+ *           example: "2025-01-01T12:00:00Z"
  */
 
 /**
  * @swagger
  * tags:
- *   name: Prescriptions
- *   description: API endpoints for managing prescriptions
+ *   name: DentalHistories
+ *   description: API endpoints for managing dental histories
  */
 
 /**
  * @swagger
- * /prescriptions:
+ * /dental_histories:
  *   get:
- *     summary: Get all prescriptions
- *     tags: [Prescriptions]
+ *     summary: Get all dental histories
+ *     tags: [DentalHistories]
  *     security:
  *       - bearerAuth: []
  *     responses:
  *       200:
- *         description: List of all prescriptions
+ *         description: List of all dental histories
  *         content:
  *           application/json:
  *             schema:
  *               type: array
  *               items:
- *                 $ref: '#/components/schemas/Prescription'
+ *                 $ref: '#/components/schemas/DentalHistory'
  *       401:
  *         description: Unauthorized - Token is missing or invalid
  */
 
 /**
  * @swagger
- * /prescriptions/{id}:
+ * /dental_histories/{id}:
  *   get:
- *     summary: Get a specific prescription by ID
- *     tags: [Prescriptions]
+ *     summary: Get a specific dental history by ID
+ *     tags: [DentalHistories]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -84,26 +76,26 @@
  *         required: true
  *         schema:
  *           type: integer
- *         description: The ID of the prescription
+ *         description: The ID of the dental history
  *     responses:
  *       200:
- *         description: Prescription retrieved successfully
+ *         description: Dental history retrieved successfully
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/Prescription'
+ *               $ref: '#/components/schemas/DentalHistory'
  *       404:
- *         description: Prescription not found
+ *         description: Dental history not found
  *       401:
  *         description: Unauthorized - Token is missing or invalid
  */
 
 /**
  * @swagger
- * /prescriptions:
+ * /dental_histories:
  *   post:
- *     summary: Create a new prescription
- *     tags: [Prescriptions]
+ *     summary: Create a new dental history
+ *     tags: [DentalHistories]
  *     security:
  *       - bearerAuth: []
  *     requestBody:
@@ -117,25 +109,22 @@
  *                 type: integer
  *                 description: ID of the patient
  *                 example: 5
- *               dentist_id:
- *                 type: integer
- *                 description: ID of the dentist
- *                 example: 2
- *               medicine:
+ *               previous_dentist:
  *                 type: string
- *                 description: List of medicines prescribed
- *                 example: "Amoxicillin 500mg, Paracetamol 650mg"
- *               notes:
+ *                 description: Name of the previous dentist
+ *                 example: "Dr. Jane Doe"
+ *               last_dentist_visit:
  *                 type: string
- *                 description: Additional notes or instructions
- *                 example: "Take medications after meals."
+ *                 format: date
+ *                 description: Date of the last visit to the dentist
+ *                 example: "2025-01-01"
  *     responses:
  *       201:
- *         description: Prescription created successfully
+ *         description: Dental history created successfully
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/Prescription'
+ *               $ref: '#/components/schemas/DentalHistory'
  *       400:
  *         description: Validation error
  *       401:
@@ -144,10 +133,10 @@
 
 /**
  * @swagger
- * /prescriptions/{id}:
+ * /dental_histories/{id}:
  *   put:
- *     summary: Update a prescription
- *     tags: [Prescriptions]
+ *     summary: Update a dental history
+ *     tags: [DentalHistories]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -156,18 +145,18 @@
  *         required: true
  *         schema:
  *           type: integer
- *         description: The ID of the prescription
+ *         description: The ID of the dental history
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
- *             $ref: '#/components/schemas/Prescription'
+ *             $ref: '#/components/schemas/DentalHistory'
  *     responses:
  *       200:
- *         description: Prescription updated successfully
+ *         description: Dental history updated successfully
  *       404:
- *         description: Prescription not found
+ *         description: Dental history not found
  *       400:
  *         description: Validation error
  *       401:
@@ -176,10 +165,10 @@
 
 /**
  * @swagger
- * /prescriptions/{id}:
+ * /dental_histories/{id}:
  *   delete:
- *     summary: Delete a prescription
- *     tags: [Prescriptions]
+ *     summary: Delete a dental history
+ *     tags: [DentalHistories]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -188,12 +177,12 @@
  *         required: true
  *         schema:
  *           type: integer
- *         description: The ID of the prescription
+ *         description: The ID of the dental history
  *     responses:
  *       200:
- *         description: Prescription deleted successfully
+ *         description: Dental history deleted successfully
  *       404:
- *         description: Prescription not found
+ *         description: Dental history not found
  *       401:
  *         description: Unauthorized - Token is missing or invalid
  */

@@ -1,9 +1,12 @@
 const express = require('express');
 const db = require('../db');
 const { verifyToken, verifyRole } = require('../middlewares/auth');
+const { successResponse, errorResponse } = require('../utils/responseHelper'); // Ensure response helpers are available
 const router = express.Router();
 
-// Get all schedules (Token required, no role restrictions)
+/**
+ * Get all schedules (Token required, no role restrictions)
+ */
 router.get('/', verifyToken, (req, res) => {
   const sql = `
     SELECT schedules.id, dentists.id AS dentist_id, schedules.date, schedules.start_time, schedules.end_time, schedules.created_at, schedules.updated_at
@@ -13,13 +16,18 @@ router.get('/', verifyToken, (req, res) => {
 
   db.query(sql, (err, results) => {
     if (err) {
-      return res.status(500).json({ message: 'Error fetching schedules.', error: err.message });
+      return errorResponse(res, 'Error fetching schedules.', err.message, 500);
     }
-    res.status(200).json(results);
+    if (results.length === 0) {
+      return successResponse(res, 'No schedules found.', []);
+    }
+    successResponse(res, 'Schedules retrieved successfully.', results);
   });
 });
 
-// Get a specific schedule by ID (Token required, no role restrictions)
+/**
+ * Get a specific schedule by ID (Token required, no role restrictions)
+ */
 router.get('/:id', verifyToken, (req, res) => {
   const { id } = req.params;
 
@@ -32,17 +40,26 @@ router.get('/:id', verifyToken, (req, res) => {
 
   db.query(sql, [id], (err, results) => {
     if (err) {
-      return res.status(500).json({ message: 'Error fetching schedule.', error: err.message });
-    } else if (results.length === 0) {
-      return res.status(404).json({ message: 'Schedule not found.' });
+      return errorResponse(res, 'Error fetching schedule.', err.message, 500);
     }
-    res.status(200).json(results[0]);
+    if (results.length === 0) {
+      return errorResponse(res, 'Schedule not found.', null, 404);
+    }
+    successResponse(res, 'Schedule retrieved successfully.', results[0]);
   });
 });
 
-// Create a new schedule (Token and Dentist role required)
+
+/**
+ * Create a new schedule (Token and Dentist role required)
+ */
 router.post('/', verifyToken, verifyRole('dentist', 'admin'), (req, res) => {
   const { dentist_id, date, start_time, end_time } = req.body;
+
+  // Validate required fields
+  if (!dentist_id || !date || !start_time || !end_time) {
+    return errorResponse(res, 'Missing required fields.', null, 400);
+  }
 
   const sql = `
     INSERT INTO schedules (dentist_id, date, start_time, end_time)
@@ -51,43 +68,50 @@ router.post('/', verifyToken, verifyRole('dentist', 'admin'), (req, res) => {
 
   db.query(sql, [dentist_id, date, start_time, end_time], (err, results) => {
     if (err) {
-      return res.status(500).json({ message: 'Error creating schedule.', error: err.message });
+      return errorResponse(res, 'Error creating schedule.', err.message, 500);
     }
-    res.status(201).json({
-      message: 'Schedule created successfully.',
-      data: {
-        id: results.insertId,
-        dentist_id,
-        date,
-        start_time,
-        end_time,
-      },
+    successResponse(res, 'Schedule created successfully.', {
+      id: results.insertId,
+      dentist_id,
+      date,
+      start_time,
+      end_time,
     });
   });
 });
 
-// Update a schedule (Token and Dentist role required)
-router.put('/:id', verifyToken, verifyRole('dentist', 'admin'), (req, res) => {
-  const { id } = req.params;
-  const { dentist_id, date, start_time, end_time } = req.body;
+/**
+ * Update a schedule (Token and Dentist role required)
+ */
+// router.put('/:id', verifyToken, verifyRole('dentist', 'admin'), (req, res) => {
+//   const { id } = req.params;
+//   const { dentist_id, date, start_time, end_time } = req.body;
 
-  const sql = `
-    UPDATE schedules
-    SET dentist_id = ?, date = ?, start_time = ?, end_time = ?
-    WHERE id = ?
-  `;
+//   // Validate required fields
+//   if (!dentist_id || !date || !start_time || !end_time) {
+//     return errorResponse(res, 'Missing required fields.', null, 400);
+//   }
 
-  db.query(sql, [dentist_id, date, start_time, end_time, id], (err, results) => {
-    if (err) {
-      return res.status(500).json({ message: 'Error updating schedule.', error: err.message });
-    } else if (results.affectedRows === 0) {
-      return res.status(404).json({ message: 'Schedule not found.' });
-    }
-    res.status(200).json({ message: 'Schedule updated successfully.' });
-  });
-});
+//   const sql = `
+//     UPDATE schedules
+//     SET dentist_id = ?, date = ?, start_time = ?, end_time = ?
+//     WHERE id = ?
+//   `;
 
-// Delete a schedule (Token and Dentist role required)
+//   db.query(sql, [dentist_id, date, start_time, end_time, id], (err, results) => {
+//     if (err) {
+//       return errorResponse(res, 'Error updating schedule.', err.message, 500);
+//     }
+//     if (results.affectedRows === 0) {
+//       return errorResponse(res, 'Schedule not found.', null, 404);
+//     }
+//     successResponse(res, 'Schedule updated successfully.');
+//   });
+// });
+
+/**
+ * Delete a schedule (Token and Dentist role required)
+ */
 router.delete('/:id', verifyToken, verifyRole('dentist', 'admin'), (req, res) => {
   const { id } = req.params;
 
@@ -95,11 +119,12 @@ router.delete('/:id', verifyToken, verifyRole('dentist', 'admin'), (req, res) =>
 
   db.query(sql, [id], (err, results) => {
     if (err) {
-      return res.status(500).json({ message: 'Error deleting schedule.', error: err.message });
-    } else if (results.affectedRows === 0) {
-      return res.status(404).json({ message: 'Schedule not found.' });
+      return errorResponse(res, 'Error deleting schedule.', err.message, 500);
     }
-    res.status(204).send(); // No content
+    if (results.affectedRows === 0) {
+      return errorResponse(res, 'Schedule not found.', null, 404);
+    }
+    successResponse(res, 'Schedule deleted successfully.', null);
   });
 });
 

@@ -1,48 +1,43 @@
 /**
  * @swagger
  * components:
- *   securitySchemes:
- *     bearerAuth:
- *       type: http
- *       scheme: bearer
- *       bearerFormat: JWT
  *   schemas:
  *     Schedule:
  *       type: object
- *       required:
- *         - dentist_id
- *         - date
- *         - start_time
- *         - end_time
  *       properties:
-
+ *         id:
+ *           type: integer
+ *           description: Unique identifier for the schedule (auto-generated)
+ *           example: 1
  *         dentist_id:
  *           type: integer
- *           description: The ID of the dentist associated with the schedule
+ *           description: ID of the dentist
  *           example: 2
  *         date:
  *           type: string
  *           format: date
- *           description: The date of the schedule
- *           example: 2025-01-14
+ *           description: Date of the schedule
+ *           example: "2025-01-14"
  *         start_time:
  *           type: string
  *           format: time
- *           description: The start time of the schedule
- *           example: 09:00:00
+ *           description: Start time of the schedule
+ *           example: "09:00:00"
  *         end_time:
  *           type: string
  *           format: time
- *           description: The end time of the schedule
- *           example: 10:00:00
+ *           description: End time of the schedule
+ *           example: "10:00:00"
  *         created_at:
  *           type: string
- *           format: datetime
- *           description: The timestamp when the schedule was created
+ *           format: date-time
+ *           description: Timestamp when the schedule was created
+ *           example: "2025-01-01T12:00:00Z"
  *         updated_at:
  *           type: string
- *           format: datetime
- *           description: The timestamp when the schedule was last updated
+ *           format: date-time
+ *           description: Timestamp when the schedule was last updated
+ *           example: "2025-01-02T12:00:00Z"
  */
 
 /**
@@ -66,13 +61,17 @@
  *         content:
  *           application/json:
  *             schema:
- *               type: array
- *               items:
- *                 $ref: '#/components/schemas/Schedule'
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: "Schedules retrieved successfully."
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/Schedule'
  *       401:
- *         description: Unauthorized
- *       500:
- *         description: Server error
+ *         description: Unauthorized - Token is missing or invalid
  */
 
 /**
@@ -92,18 +91,36 @@
  *         description: The ID of the schedule
  *     responses:
  *       200:
- *         description: The requested schedule
+ *         description: Schedule retrieved successfully
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/Schedule'
- *       401:
- *         description: Unauthorized
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: "Schedule retrieved successfully."
+ *                 data:
+ *                   $ref: '#/components/schemas/Schedule'
  *       404:
  *         description: Schedule not found
- *       500:
- *         description: Server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: "Schedule not found."
+ *                 error:
+ *                   type: string
+ *                   example: null
+ *       401:
+ *         description: Unauthorized - Token is missing or invalid
  */
+
+
+
 
 /**
  * @swagger
@@ -118,55 +135,58 @@
  *       content:
  *         application/json:
  *           schema:
- *             $ref: '#/components/schemas/Schedule'
+ *             type: object
+ *             properties:
+ *               dentist_id:
+ *                 type: integer
+ *                 description: ID of the dentist
+ *                 example: 2
+ *               date:
+ *                 type: string
+ *                 format: date
+ *                 description: Date of the schedule
+ *                 example: "2025-01-14"
+ *               start_time:
+ *                 type: string
+ *                 format: time
+ *                 description: Start time of the schedule
+ *                 example: "09:00:00"
+ *               end_time:
+ *                 type: string
+ *                 format: time
+ *                 description: End time of the schedule
+ *                 example: "10:00:00"
  *     responses:
  *       201:
  *         description: Schedule created successfully
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/Schedule'
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: "Schedule created successfully."
+ *                 data:
+ *                   $ref: '#/components/schemas/Schedule'
+ *       400:
+ *         description: Validation error - Missing required fields
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: "Missing required fields."
+ *                 error:
+ *                   type: string
+ *                   example: null
  *       401:
- *         description: Unauthorized
- *       403:
- *         description: Forbidden
- *       500:
- *         description: Server error
+ *         description: Unauthorized - Token is missing or invalid
  */
 
-/**
- * @swagger
- * /schedules/{id}:
- *   put:
- *     summary: Update an existing schedule
- *     tags: [Schedules]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: integer
- *         description: The ID of the schedule to update
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             $ref: '#/components/schemas/Schedule'
- *     responses:
- *       200:
- *         description: Schedule updated successfully
- *       401:
- *         description: Unauthorized
- *       403:
- *         description: Forbidden
- *       404:
- *         description: Schedule not found
- *       500:
- *         description: Server error
- */
+
 
 /**
  * @swagger
@@ -184,14 +204,31 @@
  *           type: integer
  *         description: The ID of the schedule to delete
  *     responses:
- *       204:
+ *       200:
  *         description: Schedule deleted successfully
- *       401:
- *         description: Unauthorized
- *       403:
- *         description: Forbidden
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: "Schedule deleted successfully."
+ *                 data:
+ *                   type: null
  *       404:
  *         description: Schedule not found
- *       500:
- *         description: Server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: "Schedule not found."
+ *                 error:
+ *                   type: string
+ *                   example: null
+ *       401:
+ *         description: Unauthorized - Token is missing or invalid
  */

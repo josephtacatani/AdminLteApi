@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: mysql
--- Generation Time: Jan 13, 2025 at 05:55 PM
+-- Generation Time: Jan 14, 2025 at 08:51 AM
 -- Server version: 8.0.40
 -- PHP Version: 8.2.8
 
@@ -26,8 +26,8 @@ DELIMITER $$
 -- Procedures
 --
 CREATE DEFINER=`root`@`%` PROCEDURE `UpdateTimeslotsForSchedule` (IN `schedule_id` INT, IN `new_start_time` TIME, IN `new_end_time` TIME)   BEGIN
-  -- Delete existing timeslots for the schedule
-  DELETE FROM timeslots WHERE schedule_id = schedule_id;
+  -- Delete existing timeslots for the specific schedule
+  DELETE FROM timeslots WHERE schedule_id = `schedule_id`; -- FIX: Correctly reference the parameter
 
   -- Initialize variables for generating new timeslots
   SET @current_time = new_start_time;
@@ -74,7 +74,6 @@ CREATE TABLE `appointments` (
   `schedule_id` int UNSIGNED NOT NULL,
   `timeslot_id` int UNSIGNED NOT NULL,
   `date_submitted` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
-  `appointment_date` date NOT NULL,
   `status` enum('pending','confirmed','canceled') DEFAULT 'pending',
   `service_list_id` int UNSIGNED DEFAULT NULL,
   `appointment_type` enum('online','walk_in') NOT NULL,
@@ -124,6 +123,13 @@ CREATE TABLE `dental_histories` (
   `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
+--
+-- Dumping data for table `dental_histories`
+--
+
+INSERT INTO `dental_histories` (`id`, `patient_id`, `previous_dentist`, `last_dentist_visit`, `created_at`, `updated_at`) VALUES
+(5, 31, 'Draa. Jane Doe', '2025-01-01', '2025-01-14 03:42:45', '2025-01-14 03:44:08');
+
 -- --------------------------------------------------------
 
 --
@@ -141,7 +147,7 @@ CREATE TABLE `dentists` (
 --
 
 INSERT INTO `dentists` (`id`, `degree`, `specialty`) VALUES
-(39, 'BBM', 'Orthodontics');
+(39, 'DDS', 'Orthodontics');
 
 -- --------------------------------------------------------
 
@@ -170,6 +176,13 @@ CREATE TABLE `health_declarations` (
   `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
+--
+-- Dumping data for table `health_declarations`
+--
+
+INSERT INTO `health_declarations` (`id`, `patient_id`, `question1`, `question2`, `question3`, `question4`, `question5`, `question6`, `question7`, `question8`, `question9`, `question10`, `question11`, `question12`, `question13`, `question14`, `created_at`, `updated_at`) VALUES
+(5, 31, 'yes', 'no', 'yes', 'no', 'yes', 'no', 'yes', 'no', 'yes', 'no', 'yes', 'no', 'yes', 'no', '2025-01-14 03:15:56', '2025-01-14 03:15:56');
+
 -- --------------------------------------------------------
 
 --
@@ -193,6 +206,13 @@ CREATE TABLE `medical_histories` (
   `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
+--
+-- Dumping data for table `medical_histories`
+--
+
+INSERT INTO `medical_histories` (`id`, `patient_id`, `question1`, `question2`, `question3`, `question4`, `question5`, `question6`, `question7`, `question8`, `question9`, `question10`, `created_at`, `updated_at`) VALUES
+(5, 31, 'No', 'No', 'Yes', 'No', 'Yes', 'No', 'Yes', 'No', 'Yes', 'No', '2025-01-14 03:00:23', '2025-01-14 03:03:25');
+
 -- --------------------------------------------------------
 
 --
@@ -208,8 +228,7 @@ CREATE TABLE `patients` (
 --
 
 INSERT INTO `patients` (`id`) VALUES
-(31),
-(35);
+(31);
 
 -- --------------------------------------------------------
 
@@ -227,6 +246,14 @@ CREATE TABLE `prescriptions` (
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+--
+-- Dumping data for table `prescriptions`
+--
+
+INSERT INTO `prescriptions` (`id`, `patient_id`, `dentist_id`, `date`, `medicine`, `notes`, `created_at`, `updated_at`) VALUES
+(1, 31, 39, '2025-01-14', 'Amoxicillin 500mg, Paracetamol 650mg', 'Take medications after meals.', '2025-01-14 04:17:39', '2025-01-14 04:17:39'),
+(2, 31, 39, '2025-01-14', 'Mefenamic 500mg, Paracetamol 650mg', 'Take medications after meals.', '2025-01-14 04:18:14', '2025-01-14 04:18:43');
 
 -- --------------------------------------------------------
 
@@ -249,7 +276,7 @@ CREATE TABLE `schedules` (
 --
 
 INSERT INTO `schedules` (`id`, `dentist_id`, `date`, `start_time`, `end_time`, `created_at`, `updated_at`) VALUES
-(7, 39, '2025-01-14', '07:00:00', '10:00:00', '2025-01-13 17:47:00', '2025-01-13 17:54:16');
+(23, 39, '2025-01-14', '09:00:00', '16:00:00', '2025-01-14 07:00:49', '2025-01-14 07:00:49');
 
 --
 -- Triggers `schedules`
@@ -259,20 +286,29 @@ CREATE TRIGGER `AfterScheduleInsert` AFTER INSERT ON `schedules` FOR EACH ROW BE
     -- Initialize session variables for current time and interval
     SET @current_time = NEW.start_time;
     SET @interval_minutes = 60; -- 1-hour interval
+    SET @break_start_time = '12:00:00'; -- Start of the break
+    SET @break_end_time = '13:00:00'; -- End of the break
 
     -- Loop to generate timeslots
     WHILE @current_time < NEW.end_time DO
-        INSERT INTO timeslots (schedule_id, start_time, end_time, created_at, updated_at)
-        VALUES (
-            NEW.id,
-            @current_time,
-            ADDTIME(@current_time, SEC_TO_TIME(@interval_minutes * 60)), -- Add 1 hour
-            CURRENT_TIMESTAMP,
-            CURRENT_TIMESTAMP
-        );
+        -- Check if the current time falls within the break period
+        IF @current_time >= @break_start_time AND @current_time < @break_end_time THEN
+            -- Skip the break period
+            SET @current_time = @break_end_time;
+        ELSE
+            -- Insert the timeslot
+            INSERT INTO timeslots (schedule_id, start_time, end_time, created_at, updated_at)
+            VALUES (
+                NEW.id,
+                @current_time,
+                ADDTIME(@current_time, SEC_TO_TIME(@interval_minutes * 60)), -- Add 1 hour
+                CURRENT_TIMESTAMP,
+                CURRENT_TIMESTAMP
+            );
 
-        -- Increment the current time by the interval
-        SET @current_time = ADDTIME(@current_time, SEC_TO_TIME(@interval_minutes * 60));
+            -- Increment the current time by the interval
+            SET @current_time = ADDTIME(@current_time, SEC_TO_TIME(@interval_minutes * 60));
+        END IF;
     END WHILE;
 END
 $$
@@ -335,9 +371,12 @@ CREATE TABLE `timeslots` (
 --
 
 INSERT INTO `timeslots` (`id`, `schedule_id`, `start_time`, `end_time`, `created_at`, `updated_at`) VALUES
-(27, 7, '07:00:00', '08:00:00', '2025-01-13 17:54:16', '2025-01-13 17:54:16'),
-(28, 7, '08:00:00', '09:00:00', '2025-01-13 17:54:16', '2025-01-13 17:54:16'),
-(29, 7, '09:00:00', '10:00:00', '2025-01-13 17:54:16', '2025-01-13 17:54:16');
+(100, 23, '09:00:00', '10:00:00', '2025-01-14 07:00:49', '2025-01-14 07:00:49'),
+(101, 23, '10:00:00', '11:00:00', '2025-01-14 07:00:49', '2025-01-14 07:00:49'),
+(102, 23, '11:00:00', '12:00:00', '2025-01-14 07:00:49', '2025-01-14 07:00:49'),
+(103, 23, '13:00:00', '14:00:00', '2025-01-14 07:00:49', '2025-01-14 07:00:49'),
+(104, 23, '14:00:00', '15:00:00', '2025-01-14 07:00:49', '2025-01-14 07:00:49'),
+(105, 23, '15:00:00', '16:00:00', '2025-01-14 07:00:49', '2025-01-14 07:00:49');
 
 -- --------------------------------------------------------
 
@@ -369,7 +408,7 @@ CREATE TABLE `users` (
   `id` int UNSIGNED NOT NULL,
   `email` varchar(255) NOT NULL,
   `password` varchar(255) NOT NULL,
-  `role` enum('patient','dentist','admin','staff') NOT NULL DEFAULT 'patient',
+  `role` enum('patient','dentist','admin','staff','super_admin') CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL DEFAULT 'patient',
   `status` enum('active','inactive','pending') DEFAULT 'pending',
   `fullname` varchar(255) NOT NULL,
   `photo` varchar(255) DEFAULT NULL,
@@ -388,10 +427,12 @@ CREATE TABLE `users` (
 --
 
 INSERT INTO `users` (`id`, `email`, `password`, `role`, `status`, `fullname`, `photo`, `birthday`, `address`, `gender`, `contact_number`, `created_at`, `updated_at`, `refresh_token`, `email_verified`) VALUES
-(31, 'user@example.com', '$2b$10$MgpVE3surwZIBgqlHahkBOVz/EfU2/4XnPdyzTvyjXUanSjMpr48G', 'patient', 'active', 'John Doe', 'profile.jpg', '1990-01-01', '123 Main Street', 'male', '123456789', '2025-01-13 14:55:04', '2025-01-13 15:31:19', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MzEsInJvbGUiOiJwYXRpZW50IiwiaWF0IjoxNzM2NzgyMTUxLCJleHAiOjE3MzczODY5NTF9.ZvhFiLAXacyUPLOmCwd1Ayb4sU6C_W3E-_ugO3MU1qw', 1),
-(34, 'admin', '$2b$10$TeeSJA50kiYea1EzkApoxeGeSqPqIRjPk4ghcqN8DQIgAjDcKjfIG', 'admin', 'active', 'Admin', 'profile.jpg', '1990-01-01', '123 Main Street', 'male', '123456789', '2025-01-13 16:26:15', '2025-01-13 17:53:37', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MzQsInJvbGUiOiJhZG1pbiIsImlhdCI6MTczNjc5MDgxNywiZXhwIjoxNzM3Mzk1NjE3fQ.DIRo6VjHyHWtXykbWLqWJX6DI5-MRb6xhbAdZyXim7s', 1),
-(35, 'dentist@example.com', '$2b$10$gbwTN3KxTUPcapkYI6yYceZwJBQEZo2AHruQ4DSqCkfyt5gKYIDwS', 'patient', 'pending', 'Dr. Jane Doe', 'profile.jpg', '1980-05-15', '123 Main Street', 'female', '1234567890', '2025-01-13 16:40:52', '2025-01-13 16:40:52', NULL, 0),
-(39, 'dentist3@example.com', '$2b$10$PfpUOYNrg6CmZlDs7rPThOkGFsbSFrR7wNlddWzlJNVoYS/wScUHa', 'dentist', 'active', 'Dr. Neil', 'profile.jpg', '1980-05-15', '123 Main Street', 'female', '123456789', '2025-01-13 17:17:50', '2025-01-13 17:31:38', NULL, 1);
+(31, 'super_admin', '$2b$10$MgpVE3surwZIBgqlHahkBOVz/EfU2/4XnPdyzTvyjXUanSjMpr48G', 'super_admin', 'active', 'John Doe', 'profile.jpg', '1990-01-01', '123 Main Street', 'male', '123456789', '2025-01-13 14:55:04', '2025-01-14 08:27:32', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MzEsInJvbGUiOiJzdXBlcl9hZG1pbiIsImlhdCI6MTczNjg0MzI1MiwiZXhwIjoxNzM3NDQ4MDUyfQ.sI-HHN9fLnaZBvI88Uzg5Q7YcrmVz-tPVe5zInwf8do', 1),
+(34, 'admin', '$2b$10$p3si/HMAkGHC3J0aqsgh2eTHDmqssyaU4RVLqJPTGLe863iYQUPjy', 'admin', 'active', 'Admin', 'profile.jpg', '1990-01-01', '123 Main Street', 'male', '123456789', '2025-01-13 16:26:15', '2025-01-14 08:40:38', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MzQsInJvbGUiOiJhZG1pbiIsImlhdCI6MTczNjg0NDAzOCwiZXhwIjoxNzM3NDQ4ODM4fQ.X9nUMDHq-Y4lXlRTIhrwc2BXtOcY_pXdB_YxcJwXLxQ', 1),
+(39, 'dentist3@example.com', '$2b$10$MgpVE3surwZIBgqlHahkBOVz/EfU2/4XnPdyzTvyjXUanSjMpr48G', 'dentist', 'active', 'Dr. Neil Smith', 'profile.jpg', '1980-05-15', '123 Main Street', 'male', '123456789', '2025-01-13 17:17:50', '2025-01-14 07:41:30', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MzksInJvbGUiOiJkZW50aXN0IiwiaWF0IjoxNzM2ODI4MjM5LCJleHAiOjE3Mzc0MzMwMzl9.gV6c_cSbaTM8P6sg2r-eyU_hgC_jr4-OrybahORqZ9s', 1),
+(41, 'dentist4@example.com', '$2b$10$9FQtBl6fJVss/lQmbP4j/eR.we3XCIvGAnNR.a.CTOB87a5kM.nfW', 'dentist', 'active', 'Dr. Jane Smith', 'profile.jpg', '1980-05-15', '123 Main Street', 'female', '123456789', '2025-01-14 06:00:55', '2025-01-14 07:54:09', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NDEsInJvbGUiOiJkZW50aXN0IiwiaWF0IjoxNzM2ODQxMjQ5LCJleHAiOjE3Mzc0NDYwNDl9.mneiqnXQc6yygdeZxIpqhXlObXZvxCOPaMX7_91LUhk', 1),
+(42, 'staff@example.com', '$2b$10$KykDCPQB4GSfbCM5ujPwFOwegXqEX8nETYH5fbQ5yhkxOdZvpR9Gy', 'staff', 'active', 'John Doe', 'profile.jpg', '1990-01-01', '123 Main Street', 'male', '123456789', '2025-01-14 08:05:50', '2025-01-14 08:05:50', NULL, 1),
+(43, 'staff2@example.com', '$2b$10$umVGa6UkRR.LQ.tVaQh.NerXNiM0vtslmO6ZnH/o4/ByYedSJyb0G', 'staff', 'active', 'John Doe', 'profile.jpg', '1990-01-01', '123 Main Street', 'male', '123456789', '2025-01-14 08:07:55', '2025-01-14 08:07:55', NULL, 1);
 
 --
 -- Triggers `users`
@@ -471,9 +512,7 @@ ALTER TABLE `patients`
 -- Indexes for table `prescriptions`
 --
 ALTER TABLE `prescriptions`
-  ADD PRIMARY KEY (`id`),
-  ADD KEY `patient_id` (`patient_id`),
-  ADD KEY `dentist_id` (`dentist_id`);
+  ADD PRIMARY KEY (`id`);
 
 --
 -- Indexes for table `schedules`
@@ -518,7 +557,7 @@ ALTER TABLE `users`
 -- AUTO_INCREMENT for table `appointments`
 --
 ALTER TABLE `appointments`
-  MODIFY `id` int UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+  MODIFY `id` int UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=10;
 
 --
 -- AUTO_INCREMENT for table `calendars`
@@ -530,19 +569,19 @@ ALTER TABLE `calendars`
 -- AUTO_INCREMENT for table `dental_histories`
 --
 ALTER TABLE `dental_histories`
-  MODIFY `id` int UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
+  MODIFY `id` int UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=7;
 
 --
 -- AUTO_INCREMENT for table `health_declarations`
 --
 ALTER TABLE `health_declarations`
-  MODIFY `id` int UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
+  MODIFY `id` int UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
 
 --
 -- AUTO_INCREMENT for table `medical_histories`
 --
 ALTER TABLE `medical_histories`
-  MODIFY `id` int UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
+  MODIFY `id` int UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
 
 --
 -- AUTO_INCREMENT for table `prescriptions`
@@ -554,7 +593,7 @@ ALTER TABLE `prescriptions`
 -- AUTO_INCREMENT for table `schedules`
 --
 ALTER TABLE `schedules`
-  MODIFY `id` int UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=8;
+  MODIFY `id` int UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=24;
 
 --
 -- AUTO_INCREMENT for table `serviceslist`
@@ -566,7 +605,7 @@ ALTER TABLE `serviceslist`
 -- AUTO_INCREMENT for table `timeslots`
 --
 ALTER TABLE `timeslots`
-  MODIFY `id` int UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=30;
+  MODIFY `id` int UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=106;
 
 --
 -- AUTO_INCREMENT for table `treatments`
@@ -578,7 +617,7 @@ ALTER TABLE `treatments`
 -- AUTO_INCREMENT for table `users`
 --
 ALTER TABLE `users`
-  MODIFY `id` int UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=40;
+  MODIFY `id` int UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=47;
 
 --
 -- Constraints for dumped tables
@@ -630,13 +669,6 @@ ALTER TABLE `medical_histories`
 --
 ALTER TABLE `patients`
   ADD CONSTRAINT `patients_ibfk_1` FOREIGN KEY (`id`) REFERENCES `users` (`id`) ON DELETE CASCADE;
-
---
--- Constraints for table `prescriptions`
---
-ALTER TABLE `prescriptions`
-  ADD CONSTRAINT `prescriptions_ibfk_1` FOREIGN KEY (`patient_id`) REFERENCES `patients` (`id`) ON DELETE CASCADE,
-  ADD CONSTRAINT `prescriptions_ibfk_2` FOREIGN KEY (`dentist_id`) REFERENCES `dentists` (`id`) ON DELETE CASCADE;
 
 --
 -- Constraints for table `schedules`

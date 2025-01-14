@@ -34,7 +34,10 @@ router.post('/register', verifyToken, verifyRole('admin'), async (req, res) => {
       [email, hashedPassword, role, fullname, photo, birthday, address, gender, contact_number],
       (err, results) => {
         if (err) {
-          return res.status(500).json({ message: 'Registration failed.', error: err.message });
+          return res.status(500).json({
+            message: 'Registration failed.',
+            error: err.message,
+          });
         }
 
         res.status(201).json({
@@ -56,7 +59,10 @@ router.post('/register', verifyToken, verifyRole('admin'), async (req, res) => {
       }
     );
   } catch (error) {
-    res.status(500).json({ message: 'An error occurred during registration.', error: error.message });
+    res.status(500).json({
+      message: 'An error occurred during registration.',
+      error: error.message,
+    });
   }
 });
 
@@ -64,218 +70,231 @@ router.post('/register', verifyToken, verifyRole('admin'), async (req, res) => {
  * Get all users (Admin only)
  */
 router.get('/', verifyToken, (req, res) => {
-    const sql = `
-      SELECT 
-        users.id AS user_id, 
-        users.email, 
-        users.role, 
-        users.status, 
-        users.fullname, 
-        users.photo, 
-        users.birthday, 
-        users.address, 
-        users.gender, 
-        users.contact_number, 
-        users.email_verified,
-        dentists.degree, 
-        dentists.specialty
-      FROM 
-        users
-      LEFT JOIN 
-        dentists 
-      ON 
-        users.id = dentists.id
-      WHERE
-        users.role = 'dentist' -- Fixed the operator here
-    `;
-  
-    db.query(sql, (err, results) => {
-      if (err) {
-        return res.status(500).json({ message: 'Error fetching dentists', error: err.message });
-      }
-      res.status(200).json(results);
+  const sql = `
+    SELECT 
+      users.id AS user_id, 
+      users.email, 
+      users.role, 
+      users.status, 
+      users.fullname, 
+      users.photo, 
+      users.birthday, 
+      users.address, 
+      users.gender, 
+      users.contact_number, 
+      users.email_verified,
+      dentists.degree, 
+      dentists.specialty
+    FROM 
+      users
+    LEFT JOIN 
+      dentists 
+    ON 
+      users.id = dentists.id
+    WHERE
+      users.role = 'dentist'
+  `;
+
+  db.query(sql, (err, results) => {
+    if (err) {
+      return res.status(500).json({
+        message: 'Error fetching dentists.',
+        error: err.message,
+      });
+    }
+    res.status(200).json({
+      message: 'Dentists retrieved successfully.',
+      data: results,
     });
   });
-  
+});
 
-  router.get('/:id', verifyToken, (req, res) => {
-    const { id } = req.params;
-  
-    const sql = `
-      SELECT 
-        users.id AS user_id, 
-        users.email, 
-        users.role, 
-        users.status, 
-        users.fullname, 
-        users.photo, 
-        users.birthday, 
-        users.address, 
-        users.gender, 
-        users.contact_number, 
-        users.email_verified,
-        dentists.degree, 
-        dentists.specialty
-      FROM 
-        users
-      LEFT JOIN 
-        dentists 
-      ON 
-        users.id = dentists.id
-      WHERE 
-        users.id = ?
-    `;
-  
-    db.query(sql, [id], (err, results) => {
-      if (err) {
-        return res.status(500).json({ message: 'Error fetching dentist and user by ID.', error: err.message });
-      } 
-      if (results.length === 0) {
-        return res.status(404).json({ message: 'Dentist or user not found.' });
-      }
-      res.status(200).json(results[0]); // Return only the first (and expected single) result
+/**
+ * Get a specific user by ID
+ */
+router.get('/:id', verifyToken, (req, res) => {
+  const { id } = req.params;
+
+  const sql = `
+    SELECT 
+      users.id AS user_id, 
+      users.email, 
+      users.role, 
+      users.status, 
+      users.fullname, 
+      users.photo, 
+      users.birthday, 
+      users.address, 
+      users.gender, 
+      users.contact_number, 
+      users.email_verified,
+      dentists.degree, 
+      dentists.specialty
+    FROM 
+      users
+    LEFT JOIN 
+      dentists 
+    ON 
+      users.id = dentists.id
+    WHERE 
+      users.id = ?
+  `;
+
+  db.query(sql, [id], (err, results) => {
+    if (err) {
+      return res.status(500).json({
+        message: 'Error fetching user by ID.',
+        error: err.message,
+      });
+    }
+    if (results.length === 0) {
+      return res.status(404).json({
+        message: 'User not found.',
+        error: null,
+      });
+    }
+    res.status(200).json({
+      message: 'User retrieved successfully.',
+      data: results[0],
     });
   });
+});
 
-  //delete
-  router.delete('/:id', verifyToken, verifyRole('admin'), (req, res) => {
-    const { id } = req.params;
-  
-    const sql = `DELETE FROM users WHERE id = ?`;
-  
-    db.query(sql, [id], (err, results) => {
-      if (err) {
-        return res.status(500).json({ message: 'Error deleting dentist or user.', error: err.message });
-      }
-      if (results.affectedRows === 0) {
-        return res.status(404).json({ message: 'Dentist or user not found.' });
-      }
-      res.status(200).json({ message: 'Dentist deleted successfully.' });
+/**
+ * Delete a user by ID (Admin only)
+ */
+router.delete('/:id', verifyToken, verifyRole('admin'), (req, res) => {
+  const { id } = req.params;
+
+  const sql = `DELETE FROM users WHERE id = ?`;
+
+  db.query(sql, [id], (err, results) => {
+    if (err) {
+      return res.status(500).json({
+        message: 'Error deleting user.',
+        error: err.message,
+      });
+    }
+    if (results.affectedRows === 0) {
+      return res.status(404).json({
+        message: 'User not found.',
+        error: null,
+      });
+    }
+    res.status(200).json({
+      message: 'User deleted successfully.',
+      data: null,
     });
   });
+});
 
-  /**
- * @swagger
- * /dentists/{id}:
- *   put:
- *     summary: Update a specific dentist and user details by ID (Admin only)
- *     tags: [Dentists]
- *     security:
- *       - bearerAuth: [] # Requires Authorization Header with Bearer Token
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: integer
- *           example: 1
- *         description: The ID of the dentist or user to update.
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               fullname:
- *                 type: string
- *                 example: Dr. Jane Smith
- *               photo:
- *                 type: string
- *                 example: profile.jpg
- *               birthday:
- *                 type: string
- *                 format: date
- *                 example: 1980-05-15
- *               address:
- *                 type: string
- *                 example: 123 Main Street
- *               gender:
- *                 type: string
- *                 enum: [male, female, other]
- *                 example: female
- *               contact_number:
- *                 type: string
- *                 example: 123456789
- *               degree:
- *                 type: string
- *                 example: DDS
- *               specialty:
- *                 type: string
- *                 example: Orthodontics
- *     responses:
- *       200:
- *         description: Dentist and user details updated successfully.
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                   example: Dentist and user details updated successfully.
- *       404:
- *         description: Dentist or user not found.
- *       500:
- *         description: Internal server error.
+/**
+ * Update user and dentist details
  */
 router.put('/:id', verifyToken, verifyRole('admin', 'dentist'), (req, res) => {
-    const { id } = req.params;
-    const {
-      fullname,
-      photo,
-      birthday,
-      address,
-      gender,
-      contact_number,
-      degree,
-      specialty,
-    } = req.body;
-  
-    // Update the `users` table
-    const updateUserSql = `
-      UPDATE users 
-      SET fullname = ?, photo = ?, birthday = ?, address = ?, gender = ?, contact_number = ?
-      WHERE id = ?
-    `;
-  
-    db.query(
-      updateUserSql,
-      [fullname, photo, birthday, address, gender, contact_number, id],
-      (userErr, userResults) => {
-        if (userErr) {
-          return res.status(500).json({ message: 'Error updating user details.', error: userErr.message });
-        }
-  
-        if (userResults.affectedRows === 0) {
-          return res.status(404).json({ message: 'User not found.' });
-        }
-  
-        // Update the `dentists` table
-        const updateDentistSql = `
-          UPDATE dentists 
-          SET degree = ?, specialty = ? 
-          WHERE id = ?
-        `;
-  
-        db.query(updateDentistSql, [degree, specialty, id], (dentistErr, dentistResults) => {
-          if (dentistErr) {
-            return res.status(500).json({ message: 'Error updating dentist details.', error: dentistErr.message });
-          }
-  
-          if (dentistResults.affectedRows === 0) {
-            return res.status(404).json({ message: 'Dentist not found.' });
-          }
-  
-          res.status(200).json({ message: 'Dentist and user details updated successfully.' });
+  const { id } = req.params;
+  const {
+    fullname,
+    photo,
+    birthday,
+    address,
+    gender,
+    contact_number,
+    degree,
+    specialty,
+  } = req.body;
+
+  const updateUserSql = `
+    UPDATE users 
+    SET fullname = ?, photo = ?, birthday = ?, address = ?, gender = ?, contact_number = ?
+    WHERE id = ?
+  `;
+
+  db.query(
+    updateUserSql,
+    [fullname, photo, birthday, address, gender, contact_number, id],
+    (userErr, userResults) => {
+      if (userErr) {
+        return res.status(500).json({
+          message: 'Error updating user details.',
+          error: userErr.message,
         });
       }
-    );
-  });
-  
-  
-  
 
+      if (userResults.affectedRows === 0) {
+        return res.status(404).json({
+          message: 'User not found.',
+          error: null,
+        });
+      }
 
+      const updateDentistSql = `
+        UPDATE dentists 
+        SET degree = ?, specialty = ? 
+        WHERE id = ?
+      `;
+
+      db.query(updateDentistSql, [degree, specialty, id], (dentistErr, dentistResults) => {
+        if (dentistErr) {
+          return res.status(500).json({
+            message: 'Error updating dentist details.',
+            error: dentistErr.message,
+          });
+        }
+
+        if (dentistResults.affectedRows === 0) {
+          return res.status(404).json({
+            message: 'Dentist not found.',
+            error: null,
+          });
+        }
+
+        res.status(200).json({
+          message: 'Dentist details updated successfully.',
+          data: null,
+        });
+      });
+    }
+  );
+});
+
+/**
+ * Reset a dentist's password (Dentist only)
+ */
+router.put('/reset-password/:id', verifyToken, verifyRole('dentist','super_admin','admin'), async (req, res) => {
+  const { id } = req.params;
+  const { newPassword } = req.body;
+
+  // Validate input
+  if (!newPassword) {
+    return errorResponse(res, 'Validation failed. Missing required fields.', null, 400);
+  }
+
+  try {
+    // Hash the new password
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    // Update the dentist's password in the database
+    const sql = `
+      UPDATE users
+      SET password = ?
+      WHERE id = ? AND role = 'dentist'
+    `;
+
+    db.query(sql, [hashedPassword, id], (err, results) => {
+      if (err) {
+        return errorResponse(res, 'Error resetting password.', err.message, 500);
+      }
+
+      if (results.affectedRows === 0) {
+        return errorResponse(res, 'Dentist not found.', null, 404);
+      }
+
+      successResponse(res, 'Dentist password reset successfully.', null);
+    });
+  } catch (error) {
+    errorResponse(res, 'An error occurred while resetting the password.', error.message, 500);
+  }
+});
 
 module.exports = router;
