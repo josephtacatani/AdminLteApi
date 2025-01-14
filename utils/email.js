@@ -1,37 +1,27 @@
 const nodemailer = require('nodemailer');
 
-const sendVerificationEmail = (email, verificationToken) => {
+const sendEmail = async (to, subject, html) => {
   const transporter = nodemailer.createTransport({
-    host: 'smtp.ethereal.email', // Ethereal SMTP server
+    host: 'smtp.ethereal.email',
     port: 587,
     secure: false, // Use TLS
     auth: {
-      user: process.env.EMAIL_USER, // Ethereal email address
-      pass: process.env.EMAIL_PASS, // Ethereal password
+      user: process.env.EMAIL_USER,
+      pass: process.env.EMAIL_PASS,
     },
   });
 
   const mailOptions = {
     from: `"Dental App" <${process.env.EMAIL_USER}>`,
-    to: email,
-    subject: 'Verify Your Email Address',
-    html: `
-      <h1>Welcome to Dental App!</h1>
-      <p>To verify your email address, please click the link below:</p>
-      <a href="http://localhost:8082/auth/verify-email?token=${verificationToken}">
-        Verify Email
-      </a>
-    `,
+    to,
+    subject,
+    html,
   };
 
-  transporter.sendMail(mailOptions, (error, info) => {
-    if (error) {
-      console.error('Error sending email:', error);
-    } else {
-      console.log('Email sent:', info.response);
-      console.log('Preview URL:', nodemailer.getTestMessageUrl(info)); // Ethereal-specific
-    }
-  });
+  const info = await transporter.sendMail(mailOptions);
+  console.log('Email sent:', info.response);
+  console.log('Preview URL:', nodemailer.getTestMessageUrl(info)); // Add preview URL for testing
+  return info; // Return info for further use if needed
 };
 
-module.exports = sendVerificationEmail;
+module.exports = sendEmail;

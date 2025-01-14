@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../db'); // Import your database connection
+const { verifyToken, verifyRole } = require('../middlewares/auth');
 
 // Get all treatments
 router.get('/treatments', (req, res) => {
@@ -14,7 +15,7 @@ router.get('/treatments', (req, res) => {
 });
 
 // Add a new treatment
-router.post('/treatments', (req, res) => {
+router.post('/treatments', verifyToken, verifyRole('admin'), (req, res) => {
   const { patientId, dateVisit, teethNos, treatment, description, fees, remarks } = req.body;
   const sql = 'INSERT INTO treatments (patientId, dateVisit, teethNos, treatment, description, fees, remarks) VALUES (?, ?, ?, ?, ?, ?, ?)';
   db.query(sql, [patientId, dateVisit, teethNos, treatment, description, fees, remarks], (err, result) => {
@@ -27,7 +28,7 @@ router.post('/treatments', (req, res) => {
 });
 
 // Update a treatment
-router.put('/treatments/:id', (req, res) => {
+router.put('/treatments/:id', verifyToken, verifyRole('admin'), (req, res) => {
   const { id } = req.params;
   const { patientId, dateVisit, teethNos, treatment, description, fees, remarks } = req.body;
   const sql = 'UPDATE treatments SET patientId = ?, dateVisit = ?, teethNos = ?, treatment = ?, description = ?, fees = ?, remarks = ? WHERE id = ?';
@@ -41,7 +42,7 @@ router.put('/treatments/:id', (req, res) => {
 });
 
 // Delete a treatment
-router.delete('/treatments/:id', (req, res) => {
+router.delete('/treatments/:id', verifyToken, verifyRole('admin'), (req, res) => {
   const { id } = req.params;
   db.query('DELETE FROM treatments WHERE id = ?', [id], (err) => {
     if (err) {
