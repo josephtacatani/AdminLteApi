@@ -42,4 +42,6 @@ const verifyRole = (...allowedRoles) => (req, res, next) => {
   next();
 };
 
+
+
 module.exports = { generateAccessToken, generateRefreshToken, verifyToken, verifyRole };
