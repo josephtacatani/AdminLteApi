@@ -11,32 +11,32 @@
  *           example: 1
  *         dentist_id:
  *           type: integer
- *           description: ID of the dentist
+ *           description: Unique identifier for the associated dentist
  *           example: 2
  *         date:
  *           type: string
  *           format: date
- *           description: Date of the schedule
+ *           description: The date of the scheduled appointment
  *           example: "2025-01-14"
  *         start_time:
  *           type: string
  *           format: time
- *           description: Start time of the schedule
+ *           description: The starting time of the schedule
  *           example: "09:00:00"
  *         end_time:
  *           type: string
  *           format: time
- *           description: End time of the schedule
+ *           description: The ending time of the schedule
  *           example: "10:00:00"
  *         created_at:
  *           type: string
  *           format: date-time
- *           description: Timestamp when the schedule was created
+ *           description: Timestamp indicating when the schedule was created
  *           example: "2025-01-01T12:00:00Z"
  *         updated_at:
  *           type: string
  *           format: date-time
- *           description: Timestamp when the schedule was last updated
+ *           description: Timestamp indicating the last update of the schedule
  *           example: "2025-01-02T12:00:00Z"
  */
 
@@ -44,20 +44,20 @@
  * @swagger
  * tags:
  *   name: Schedules
- *   description: API endpoints for managing schedules
+ *   description: API endpoints for managing dental schedules
  */
 
 /**
  * @swagger
  * /schedules:
  *   get:
- *     summary: Get all schedules
+ *     summary: Retrieve all schedules
  *     tags: [Schedules]
  *     security:
  *       - bearerAuth: []
  *     responses:
  *       200:
- *         description: List of all schedules
+ *         description: Successfully retrieved the list of schedules
  *         content:
  *           application/json:
  *             schema:
@@ -71,14 +71,14 @@
  *                   items:
  *                     $ref: '#/components/schemas/Schedule'
  *       401:
- *         description: Unauthorized - Token is missing or invalid
+ *         description: Unauthorized access - Token required
  */
 
 /**
  * @swagger
  * /schedules/{id}:
  *   get:
- *     summary: Get a specific schedule by ID
+ *     summary: Retrieve a specific schedule by ID
  *     tags: [Schedules]
  *     security:
  *       - bearerAuth: []
@@ -88,10 +88,10 @@
  *         required: true
  *         schema:
  *           type: integer
- *         description: The ID of the schedule
+ *         description: The ID of the requested schedule
  *     responses:
  *       200:
- *         description: Schedule retrieved successfully
+ *         description: Successfully retrieved the schedule
  *         content:
  *           application/json:
  *             schema:
@@ -104,6 +104,28 @@
  *                   $ref: '#/components/schemas/Schedule'
  *       404:
  *         description: Schedule not found
+ *       401:
+ *         description: Unauthorized access - Token required
+ */
+
+/**
+ * @swagger
+ * /schedules/dentist/{dentistId}:
+ *   get:
+ *     summary: Retrieve schedules for a specific dentist
+ *     tags: [Schedules]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: dentistId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: The ID of the dentist whose schedules are requested
+ *     responses:
+ *       200:
+ *         description: Successfully retrieved schedules for the dentist
  *         content:
  *           application/json:
  *             schema:
@@ -111,16 +133,16 @@
  *               properties:
  *                 message:
  *                   type: string
- *                   example: "Schedule not found."
- *                 error:
- *                   type: string
- *                   example: null
+ *                   example: "Schedules retrieved successfully."
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/Schedule'
+ *       404:
+ *         description: No schedules found for the specified dentist
  *       401:
- *         description: Unauthorized - Token is missing or invalid
+ *         description: Unauthorized access - Token required
  */
-
-
-
 
 /**
  * @swagger
@@ -139,7 +161,7 @@
  *             properties:
  *               dentist_id:
  *                 type: integer
- *                 description: ID of the dentist
+ *                 description: Unique identifier of the dentist
  *                 example: 2
  *               date:
  *                 type: string
@@ -158,41 +180,18 @@
  *                 example: "10:00:00"
  *     responses:
  *       201:
- *         description: Schedule created successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                   example: "Schedule created successfully."
- *                 data:
- *                   $ref: '#/components/schemas/Schedule'
+ *         description: Schedule successfully created
  *       400:
- *         description: Validation error - Missing required fields
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                   example: "Missing required fields."
- *                 error:
- *                   type: string
- *                   example: null
+ *         description: Missing required fields
  *       401:
- *         description: Unauthorized - Token is missing or invalid
+ *         description: Unauthorized access - Token required
  */
-
-
 
 /**
  * @swagger
  * /schedules/{id}:
  *   delete:
- *     summary: Delete a schedule
+ *     summary: Remove a schedule
  *     tags: [Schedules]
  *     security:
  *       - bearerAuth: []
@@ -202,33 +201,12 @@
  *         required: true
  *         schema:
  *           type: integer
- *         description: The ID of the schedule to delete
+ *         description: The ID of the schedule to be deleted
  *     responses:
  *       200:
- *         description: Schedule deleted successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                   example: "Schedule deleted successfully."
- *                 data:
- *                   type: null
+ *         description: Successfully deleted the schedule
  *       404:
  *         description: Schedule not found
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                   example: "Schedule not found."
- *                 error:
- *                   type: string
- *                   example: null
  *       401:
- *         description: Unauthorized - Token is missing or invalid
+ *         description: Unauthorized access - Token required
  */
