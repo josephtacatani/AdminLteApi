@@ -93,33 +93,76 @@ router.post('/', verifyToken, async (req, res) => {
 });
 
 
-
 /**
- * ✅ Update an appointment
+ * ✅ Update an existing appointment (With Services and Transactions)
  */
-router.put('/:id', verifyToken, (req, res) => {
+router.put('/:id', verifyToken, async (req, res) => {
   const { id } = req.params;
-  const { patient_id, dentist_id, schedule_id, timeslot_id, status, appointment_type } = req.body;
+  let { patient_id, dentist_id, schedule_id, timeslot_id, status, appointment_type, service_list_id, health_declaration_id } = req.body;
 
-  if (!patient_id || !dentist_id || !schedule_id || !timeslot_id || !status || !appointment_type) {
-    return errorResponse(res, 'Missing required fields.', null, 400);
+  // ✅ Validate required fields
+  if (!patient_id || !dentist_id || !schedule_id || !timeslot_id || !status || !appointment_type || !Array.isArray(service_list_id) || service_list_id.length === 0) {
+    return errorResponse(res, 'Missing required fields or invalid service list.', null, 400);
   }
 
-  const sql = `
-    UPDATE appointments
-    SET patient_id = ?, dentist_id = ?, schedule_id = ?, timeslot_id = ?, status = ?, appointment_type = ?
-    WHERE id = ?
-  `;
-  db.query(sql, [patient_id, dentist_id, schedule_id, timeslot_id, status, appointment_type, id], (err, results) => {
-    if (err) {
-      return errorResponse(res, 'Error updating appointment.', err.message, 500);
-    }
-    if (results.affectedRows === 0) {
+  try {
+    await db.promise().beginTransaction(); // ✅ Start transaction
+
+    // ✅ Step 1: Check if the appointment exists
+    const [appointmentCheck] = await db.promise().query(
+      `SELECT * FROM appointments WHERE id = ?`, [id]
+    );
+
+    if (appointmentCheck.length === 0) {
+      await db.promise().rollback();
       return errorResponse(res, 'Appointment not found.', null, 404);
     }
+
+    // ✅ Step 2: Fetch latest health declaration if not provided
+    if (!health_declaration_id) {
+      const [healthResults] = await db.promise().query(
+        `SELECT id FROM health_declarations WHERE patient_id = ? ORDER BY created_at DESC LIMIT 1`,
+        [patient_id]
+      );
+
+      if (healthResults.length === 0) {
+        await db.promise().rollback();
+        return errorResponse(res, 'Health declaration is required before updating an appointment.', null, 400);
+      }
+
+      health_declaration_id = healthResults[0].id; // ✅ Automatically use the latest health declaration
+    }
+
+    // ✅ Step 3: Update the appointment
+    const updateAppointmentSql = `
+      UPDATE appointments 
+      SET patient_id = ?, dentist_id = ?, schedule_id = ?, timeslot_id = ?, status = ?, appointment_type = ?, health_declaration_id = ?
+      WHERE id = ?
+    `;
+    await db.promise().query(updateAppointmentSql, [
+      patient_id, dentist_id, schedule_id, timeslot_id, status, appointment_type, health_declaration_id, id
+    ]);
+
+    // ✅ Step 4: Remove old services and insert new ones
+    await db.promise().query(`DELETE FROM appointment_services WHERE appointment_id = ?`, [id]);
+
+    const serviceSql = `INSERT INTO appointment_services (appointment_id, service_list_id) VALUES ?`;
+    const serviceValues = service_list_id.map(serviceId => [id, serviceId]);
+
+    await db.promise().query(serviceSql, [serviceValues]);
+
+    // ✅ Step 5: Commit transaction
+    await db.promise().commit();
+
     successResponse(res, 'Appointment updated successfully.', { appointmentId: id });
-  });
+
+  } catch (error) {
+    await db.promise().rollback(); // 🔹 Rollback transaction on error
+    errorResponse(res, 'Error updating appointment.', error.message, 500);
+  }
 });
+
+
 
 /**
  * ✅ Delete an appointment
@@ -153,5 +196,45 @@ router.delete('/:id', verifyToken, (req, res) => {
     }
   });
 });
+
+/**
+ * ✅ Get a specific appointment by Patient ID
+ */
+router.get('/by-patient/:patient_id', verifyToken, (req, res) => {
+  const { patient_id } = req.params;
+
+  db.query('SELECT * FROM appointments WHERE patient_id = ? ORDER BY created_at DESC LIMIT 1', [patient_id], (err, results) => {
+    if (err) {
+      return errorResponse(res, 'Error fetching appointment by patient ID.', err.message, 500);
+    }
+    if (results.length === 0) {
+      return errorResponse(res, 'No appointment found for this patient.', null, 404);
+    }
+    successResponse(res, 'Appointment retrieved successfully.', results[0]);
+  });
+});
+
+/**
+ * ✅ Cancel Appointment
+ */
+router.patch('/cancel/:appointment_id', verifyToken, (req, res) => {
+  const { appointment_id } = req.params;
+
+  const sql = `UPDATE appointments SET status = 'canceled' WHERE id = ?`;
+
+  db.query(sql, [appointment_id], (err, result) => {
+    if (err) {
+      return errorResponse(res, 'Error canceling appointment.', err.message, 500);
+    }
+
+    if (result.affectedRows === 0) {
+      return errorResponse(res, 'Appointment not found.', null, 404);
+    }
+
+    successResponse(res, 'Appointment canceled successfully.', { appointment_id });
+  });
+});
+
+
 
 module.exports = router;
