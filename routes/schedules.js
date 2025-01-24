@@ -188,4 +188,26 @@ router.get('/dentist/:dentistId', verifyToken, (req, res) => {
   });
 });
 
+router.get('/confirmed/:schedule_id', verifyToken, (req, res) => {
+  const { schedule_id } = req.params;
+
+  if (isNaN(schedule_id)) {
+      return errorResponse(res, 'Invalid schedule ID.', null, 'Validation Error', 400);
+  }
+
+  const sql = `
+      SELECT timeslots.id, timeslots.schedule_id, timeslots.start_time, timeslots.end_time, appointments.status 
+      FROM timeslots 
+      JOIN appointments ON timeslots.id = appointments.timeslot_id
+      WHERE timeslots.schedule_id = ? AND appointments.status = 'confirmed';
+  `;
+
+  db.query(sql, [schedule_id], (err, results) => {
+      if (err) {
+          return errorResponse(res, 'Error fetching confirmed timeslots.', null, err.message, 500);
+      }
+      successResponse(res, 'Confirmed timeslots retrieved successfully.', results, null);
+  });
+});
+
 module.exports = router;

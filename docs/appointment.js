@@ -525,3 +525,69 @@
  */
 
 
+/**
+ * @swagger
+ * /appointments/getAllAppointmentsWithServicesByPatientId/{patient_id}:
+ *   get:
+ *     summary: Get all appointments for a patient with detailed services
+ *     tags: [Appointments]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: patient_id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: The ID of the patient
+ *     responses:
+ *       200:
+ *         description: Detailed appointments retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       appointment_id:
+ *                         type: integer
+ *                       status:
+ *                         type: string
+ *                       appointment_type:
+ *                         type: string
+ *                       schedule_date:
+ *                         type: string
+ *                         format: date
+ *                       timeslot_start_time:
+ *                         type: string
+ *                         format: time
+ *                       timeslot_end_time:
+ *                         type: string
+ *                         format: time
+ *                       dentist_name:
+ *                         type: string
+ *                       patient_name:
+ *                         type: string
+ *                       services:
+ *                         type: array
+ *                         items:
+ *                           type: object
+ *                           properties:
+ *                             service_id:
+ *                               type: integer
+ *                             service_name:
+ *                               type: string
+ *       401:
+ *         description: Unauthorized - Token is missing or invalid
+ *       404:
+ *         description: No appointments found for this patient
+ *       500:
+ *         description: Internal server error
+ */
+

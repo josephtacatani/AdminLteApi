@@ -9,9 +9,15 @@ const router = express.Router();
 router.get('/', verifyToken, (req, res) => {
   db.query('SELECT * FROM serviceslist', (err, results) => {
     if (err) {
-      return res.status(500).json({ message: 'Error fetching services.', error: err.message });
+      return res.status(500).json({
+        message: 'Error fetching services.',
+        error: err.message,
+      });
     }
-    res.status(200).json(results);
+    res.status(200).json({
+      message: results.length ? 'Services retrieved successfully.' : 'No services found.',
+      data: results,
+    });
   });
 });
 
@@ -19,14 +25,23 @@ router.get('/', verifyToken, (req, res) => {
  * Get a specific service by ID
  */
 router.get('/:id', verifyToken, (req, res) => {
-  const { id } = req.params;
+  const { id } = req.params; // ✅ Correct: Extract "id" from req.params
   db.query('SELECT * FROM serviceslist WHERE id = ?', [id], (err, results) => {
     if (err) {
-      return res.status(500).json({ message: 'Error fetching service.', error: err.message });
-    } else if (results.length === 0) {
-      return res.status(404).json({ message: 'Service not found.' });
+      return res.status(500).json({
+        message: 'Error fetching service.',
+        error: err.message,
+      });
     }
-    res.status(200).json(results[0]);
+    if (results.length === 0) {
+      return res.status(404).json({
+        message: 'Service not found.',
+      });
+    }
+    res.status(200).json({
+      message: 'Service retrieved successfully.',
+      data: results[0],
+    });
   });
 });
 
@@ -39,11 +54,20 @@ router.post('/', verifyToken, verifyRole('admin'), (req, res) => {
   const sql = 'INSERT INTO serviceslist (service_name, title, content, photo) VALUES (?, ?, ?, ?)';
   db.query(sql, [service_name, title, content, photo], (err, results) => {
     if (err) {
-      return res.status(500).json({ message: 'Error creating service.', error: err.message });
+      return res.status(500).json({
+        message: 'Error creating service.',
+        error: err.message,
+      });
     }
     res.status(201).json({
       message: 'Service created successfully.',
-      data: { id: results.insertId, service_name, title, content, photo },
+      data: {
+        id: results.insertId,
+        service_name,
+        title,
+        content,
+        photo,
+      },
     });
   });
 });
@@ -58,11 +82,19 @@ router.put('/:id', verifyToken, verifyRole('admin'), (req, res) => {
   const sql = 'UPDATE serviceslist SET service_name = ?, title = ?, content = ?, photo = ? WHERE id = ?';
   db.query(sql, [service_name, title, content, photo, id], (err, results) => {
     if (err) {
-      return res.status(500).json({ message: 'Error updating service.', error: err.message });
-    } else if (results.affectedRows === 0) {
-      return res.status(404).json({ message: 'Service not found.' });
+      return res.status(500).json({
+        message: 'Error updating service.',
+        error: err.message,
+      });
     }
-    res.status(200).json({ message: 'Service updated successfully.' });
+    if (results.affectedRows === 0) {
+      return res.status(404).json({
+        message: 'Service not found.',
+      });
+    }
+    res.status(200).json({
+      message: 'Service updated successfully.',
+    });
   });
 });
 
@@ -74,11 +106,19 @@ router.delete('/:id', verifyToken, verifyRole('admin'), (req, res) => {
 
   db.query('DELETE FROM serviceslist WHERE id = ?', [id], (err, results) => {
     if (err) {
-      return res.status(500).json({ message: 'Error deleting service.', error: err.message });
-    } else if (results.affectedRows === 0) {
-      return res.status(404).json({ message: 'Service not found.' });
+      return res.status(500).json({
+        message: 'Error deleting service.',
+        error: err.message,
+      });
     }
-    res.status(204).send(); // No content
+    if (results.affectedRows === 0) {
+      return res.status(404).json({
+        message: 'Service not found.',
+      });
+    }
+    res.status(200).json({
+      message: 'Service deleted successfully.',
+    });
   });
 });
 

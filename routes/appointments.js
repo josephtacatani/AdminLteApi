@@ -235,6 +235,77 @@ router.patch('/cancel/:appointment_id', verifyToken, (req, res) => {
   });
 });
 
+/**
+ * ✅ Get all detailed appointments for a patient (Including Services)
+ */
+router.get("/getAllAppointmentsWithServicesByPatientId/:patient_id", verifyToken, (req, res) => {
+  const { patient_id } = req.params;
+
+  const sql = `
+    SELECT 
+      a.id AS appointment_id,
+      a.status,
+      a.appointment_type,
+      s.date AS schedule_date,
+      t.start_time AS timeslot_start_time,
+      t.end_time AS timeslot_end_time,
+      u.fullname AS dentist_name,  -- Fetch dentist name from users
+      p.fullname AS patient_name,  -- Fetch patient name from users
+      sv.id AS service_id,
+      sv.service_name
+    FROM appointments a
+    JOIN schedules s ON a.schedule_id = s.id
+    JOIN timeslots t ON a.timeslot_id = t.id
+    JOIN dentists d ON a.dentist_id = d.id
+    JOIN users u ON d.id = u.id  -- Fetch dentist's name
+    JOIN users p ON a.patient_id = p.id  -- Fetch patient name
+    LEFT JOIN appointment_services aps ON a.id = aps.appointment_id
+    LEFT JOIN serviceslist sv ON aps.service_list_id = sv.id
+    WHERE a.patient_id = ?
+    ORDER BY a.created_at DESC;
+  `;
+
+  db.query(sql, [patient_id], (err, results) => {
+    if (err) {
+      return errorResponse(res, "Error fetching detailed appointments.", err.message, 500);
+    }
+
+    if (results.length === 0) {
+      return successResponse(res, "No appointments found for this patient.", []);
+    }
+
+    // ✅ Group results by appointment_id to handle multiple services per appointment
+    const groupedAppointments = results.reduce((acc, row) => {
+      const { 
+        appointment_id, status, appointment_type, schedule_date, timeslot_start_time, timeslot_end_time, 
+        dentist_name, patient_name, service_id, service_name 
+      } = row;
+
+      if (!acc[appointment_id]) {
+        acc[appointment_id] = {
+          appointment_id,
+          status,
+          appointment_type,
+          schedule_date,
+          timeslot_start_time,
+          timeslot_end_time,
+          dentist_name,
+          patient_name,
+          services: []
+        };
+      }
+
+      if (service_id) {
+        acc[appointment_id].services.push({ service_id, service_name });
+      }
+
+      return acc;
+    }, {});
+
+    successResponse(res, "Detailed appointments retrieved successfully.", Object.values(groupedAppointments));
+  });
+
+});
 
 
 module.exports = router;

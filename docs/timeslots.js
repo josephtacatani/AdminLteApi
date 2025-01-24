@@ -181,3 +181,60 @@
  *                         format: date-time
  *                         example: "2025-01-14T05:54:11Z"
  */
+
+/**
+ * @swagger
+ * /timeslots/{id}:
+ *   get:
+ *     summary: Retrieve a timeslot by ID
+ *     description: Fetches a specific timeslot using its unique ID.
+ *     tags: [Timeslots]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: The unique identifier of the timeslot.
+ *     responses:
+ *       200:
+ *         description: Timeslot retrieved successfully.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: "Timeslot retrieved successfully."
+ *                 data:
+ *                   $ref: '#/components/schemas/Timeslot'
+ *       404:
+ *         description: Timeslot not found.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: "Timeslot not found."
+ *                 error:
+ *                   type: string
+ *                   example: "No timeslot found with the given ID."
+ *       500:
+ *         description: Server error.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: "Error fetching the timeslot."
+ *                 error:
+ *                   type: string
+ *                   example: "Database connection error."
+ */

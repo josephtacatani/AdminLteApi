@@ -67,4 +67,30 @@ router.get('/all/:schedule_id', verifyToken, (req, res) => {
   });
 });
 
+/**
+ * Get a single timeslot by ID
+ */
+router.get('/:id', verifyToken, (req, res) => {
+  const { id } = req.params;
+
+  const sql = `
+    SELECT id, schedule_id, start_time, end_time, created_at, updated_at
+    FROM timeslots
+    WHERE id = ?;
+  `;
+
+  db.query(sql, [id], (err, results) => {
+    if (err) {
+      return errorResponse(res, 'Error fetching the timeslot.', err.message, 500);
+    }
+
+    if (results.length === 0) {
+      return errorResponse(res, 'Timeslot not found.', 'No timeslot found with the given ID.', 404);
+    }
+
+    successResponse(res, 'Timeslot retrieved successfully.', results[0]);
+  });
+});
+
+
 module.exports = router;
