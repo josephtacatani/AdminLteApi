@@ -12,60 +12,68 @@
  *       properties:
  *         id:
  *           type: integer
- *           description: Unique identifier for the service
+ *           description: Unique identifier for the service.
  *           example: 1
  *         service_name:
  *           type: string
- *           description: Name of the service
- *           example: Dental Checkup
+ *           description: Name of the service.
+ *           example: "Dental Checkup"
  *         title:
  *           type: string
- *           description: Title of the service
- *           example: Comprehensive Dental Checkup
+ *           description: Title of the service.
+ *           example: "Comprehensive Dental Checkup"
  *         content:
  *           type: string
- *           description: Description of the service
- *           example: A thorough examination of your dental health.
+ *           description: Description of the service.
+ *           example: "A thorough examination of your dental health."
  *         photo:
  *           type: string
- *           description: URL or filename of the service photo
- *           example: http://example.com/photo.jpg
+ *           description: URL or filename of the service photo.
+ *           example: "http://example.com/photo.jpg"
  */
 
 /**
  * @swagger
  * tags:
- *   name: ServicesList
- *   description: API endpoints for managing services
+ *   name: Services
+ *   description: API endpoints for managing dental services
  */
 
 /**
  * @swagger
  * /serviceslist:
  *   get:
- *     summary: Get all services
- *     tags: [ServicesList]
+ *     summary: Retrieve all services
+ *     tags: [Services]
  *     security:
  *       - bearerAuth: []
  *     responses:
  *       200:
- *         description: List of all services
+ *         description: Successfully retrieved the list of all services.
  *         content:
  *           application/json:
  *             schema:
- *               type: array
- *               items:
- *                 $ref: '#/components/schemas/Service'
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: "Services retrieved successfully."
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/Service'
  *       401:
- *         description: Unauthorized - Token is missing or invalid
+ *         description: Unauthorized - Token is missing or invalid.
+ *       500:
+ *         description: Internal Server Error.
  */
 
 /**
  * @swagger
  * /serviceslist/{id}:
  *   get:
- *     summary: Get a specific service by ID
- *     tags: [ServicesList]
+ *     summary: Retrieve a specific service by ID
+ *     tags: [Services]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -74,18 +82,26 @@
  *         required: true
  *         schema:
  *           type: integer
- *         description: The ID of the service
+ *         description: The unique ID of the service.
  *     responses:
  *       200:
- *         description: Service retrieved successfully
+ *         description: Successfully retrieved the service.
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/Service'
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: "Service retrieved successfully."
+ *                 data:
+ *                   $ref: '#/components/schemas/Service'
  *       404:
- *         description: Service not found
+ *         description: Service not found.
  *       401:
- *         description: Unauthorized - Token is missing or invalid
+ *         description: Unauthorized - Token is missing or invalid.
+ *       500:
+ *         description: Internal Server Error.
  */
 
 /**
@@ -93,7 +109,7 @@
  * /serviceslist:
  *   post:
  *     summary: Create a new service
- *     tags: [ServicesList]
+ *     tags: [Services]
  *     security:
  *       - bearerAuth: []
  *     requestBody:
@@ -105,33 +121,41 @@
  *             properties:
  *               service_name:
  *                 type: string
- *                 example: Dental Checkup
+ *                 example: "Dental Checkup"
  *               title:
  *                 type: string
- *                 example: Comprehensive Dental Checkup
+ *                 example: "Comprehensive Dental Checkup"
  *               content:
  *                 type: string
- *                 example: A thorough examination of your dental health.
+ *                 example: "A thorough examination of your dental health."
  *               photo:
  *                 type: string
- *                 example: http://example.com/photo.jpg
+ *                 example: "http://example.com/photo.jpg"
  *     responses:
  *       201:
- *         description: Service created successfully
+ *         description: Successfully created a new service.
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/Service'
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: "Service created successfully."
+ *                 data:
+ *                   $ref: '#/components/schemas/Service'
  *       401:
- *         description: Unauthorized - Token is missing or invalid
+ *         description: Unauthorized - Token is missing or invalid.
+ *       500:
+ *         description: Internal Server Error.
  */
 
 /**
  * @swagger
  * /serviceslist/{id}:
  *   put:
- *     summary: Update a service
- *     tags: [ServicesList]
+ *     summary: Update an existing service
+ *     tags: [Services]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -140,27 +164,51 @@
  *         required: true
  *         schema:
  *           type: integer
+ *         description: The unique ID of the service to update.
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
- *             $ref: '#/components/schemas/Service'
+ *             type: object
+ *             properties:
+ *               service_name:
+ *                 type: string
+ *                 example: "Updated Dental Checkup"
+ *               title:
+ *                 type: string
+ *                 example: "Updated Comprehensive Dental Checkup"
+ *               content:
+ *                 type: string
+ *                 example: "An updated description of your dental health."
+ *               photo:
+ *                 type: string
+ *                 example: "http://example.com/updated_photo.jpg"
  *     responses:
  *       200:
- *         description: Service updated successfully
+ *         description: Successfully updated the service.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: "Service updated successfully."
  *       404:
- *         description: Service not found
+ *         description: Service not found.
  *       401:
- *         description: Unauthorized - Token is missing or invalid
+ *         description: Unauthorized - Token is missing or invalid.
+ *       500:
+ *         description: Internal Server Error.
  */
 
 /**
  * @swagger
  * /serviceslist/{id}:
  *   delete:
- *     summary: Delete a service
- *     tags: [ServicesList]
+ *     summary: Delete a service by ID
+ *     tags: [Services]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -169,11 +217,22 @@
  *         required: true
  *         schema:
  *           type: integer
+ *         description: The unique ID of the service to delete.
  *     responses:
- *       204:
- *         description: Service deleted successfully
+ *       200:
+ *         description: Successfully deleted the service.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: "Service deleted successfully."
  *       404:
- *         description: Service not found
+ *         description: Service not found.
  *       401:
- *         description: Unauthorized - Token is missing or invalid
+ *         description: Unauthorized - Token is missing or invalid.
+ *       500:
+ *         description: Internal Server Error.
  */

@@ -5,7 +5,7 @@ const { successResponse, errorResponse } = require('../utils/responseHelper'); /
 const router = express.Router();
 
 /**
- * Get all appointments
+ * ✅ Get all appointments
  */
 router.get('/', verifyToken, (req, res) => {
   db.query('SELECT * FROM appointments', (err, results) => {
@@ -20,7 +20,7 @@ router.get('/', verifyToken, (req, res) => {
 });
 
 /**
- * Get a specific appointment by ID
+ * ✅ Get a specific appointment by ID
  */
 router.get('/:id', verifyToken, (req, res) => {
   const { id } = req.params;
@@ -36,98 +36,275 @@ router.get('/:id', verifyToken, (req, res) => {
 });
 
 /**
- * Create a new appointment
+ * ✅ Create a new appointment (With Services and Transactions)
  */
-/**
- * Create a new appointment
- */
-/**
- * Create a new appointment
- */
-router.post('/', verifyToken, (req, res) => {
-  const { patient_id, dentist_id, schedule_id, timeslot_id, status, appointment_type, service_list_id } = req.body;
+router.post('/', verifyToken, async (req, res) => {
+  let { patient_id, dentist_id, schedule_id, timeslot_id, status, appointment_type, service_list_id, health_declaration_id } = req.body;
 
-  // Validate required fields
-  if (!patient_id || !dentist_id || !schedule_id || !timeslot_id || !status || !appointment_type || !service_list_id) {
-    return errorResponse(res, 'Missing required fields.', null, 400);
+  // ✅ Validate required fields
+  if (!patient_id || !dentist_id || !schedule_id || !timeslot_id || !status || !appointment_type || !Array.isArray(service_list_id) || service_list_id.length === 0) {
+    return errorResponse(res, 'Missing required fields or invalid service list.', null, 400);
   }
 
-  // Check if the patient has a health declaration
-  const healthDeclarationQuery = 'SELECT id FROM health_declarations WHERE patient_id = ?';
-  db.query(healthDeclarationQuery, [patient_id], (err, healthResults) => {
-    if (err) {
-      return errorResponse(res, 'Error checking health declaration.', err.message, 500);
-    }
+  try {
+    await db.promise().beginTransaction(); // ✅ Start transaction
 
-    if (healthResults.length === 0) {
-      return errorResponse(res, 'Health declaration is required before booking an appointment.', null, 400);
-    }
+    // ✅ Step 1: Fetch latest health declaration if not provided
+    if (!health_declaration_id) {
+      const [healthResults] = await db.promise().query(
+        `SELECT id FROM health_declarations WHERE patient_id = ? ORDER BY created_at DESC LIMIT 1`,
+        [patient_id]
+      );
 
-    const health_declaration_id = healthResults[0].id; // Extract the health declaration ID
-
-    // Proceed to create the appointment
-    const sql = `
-      INSERT INTO appointments (patient_id, dentist_id, schedule_id, timeslot_id, status, appointment_type, service_list_id, health_declaration_id)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `;
-    db.query(sql, [patient_id, dentist_id, schedule_id, timeslot_id, status, appointment_type, service_list_id, health_declaration_id], (err, results) => {
-      if (err) {
-        return errorResponse(res, 'Error creating appointment.', err.message, 500);
+      if (healthResults.length === 0) {
+        await db.promise().rollback();
+        return errorResponse(res, 'Health declaration is required before booking an appointment.', null, 400);
       }
 
-      // Return the created appointment ID
-      successResponse(res, 'Appointment created successfully.', { id: results.insertId });
-    });
-  });
+      health_declaration_id = healthResults[0].id; // ✅ Automatically use the latest health declaration
+    }
+
+    // ✅ Step 2: Insert the appointment
+    const appointmentSql = `
+      INSERT INTO appointments (patient_id, dentist_id, schedule_id, timeslot_id, status, appointment_type, health_declaration_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `;
+    const [appointmentResult] = await db.promise().query(appointmentSql, [
+      patient_id, dentist_id, schedule_id, timeslot_id, status, appointment_type, health_declaration_id
+    ]);
+
+    const appointmentId = appointmentResult.insertId;
+
+    // ✅ Step 3: Insert multiple services into `appointment_services`
+    const serviceSql = `INSERT INTO appointment_services (appointment_id, service_list_id) VALUES ?`;
+    const serviceValues = service_list_id.map(serviceId => [appointmentId, serviceId]);
+
+    await db.promise().query(serviceSql, [serviceValues]);
+
+    // ✅ Step 4: Commit transaction
+    await db.promise().commit();
+
+    successResponse(res, 'Appointment created successfully.', { appointmentId });
+
+  } catch (error) {
+    await db.promise().rollback(); // 🔹 Rollback transaction on error
+    errorResponse(res, 'Error creating appointment.', error.message, 500);
+  }
 });
 
 
-
 /**
- * Update an appointment
+ * ✅ Update an existing appointment (With Services and Transactions)
  */
-router.put('/:id', verifyToken, (req, res) => {
+router.put('/:id', verifyToken, async (req, res) => {
   const { id } = req.params;
-  const { patient_id, dentist_id, schedule_id, timeslot_id, status, appointment_type, service_list_id } = req.body;
+  let { patient_id, dentist_id, schedule_id, timeslot_id, status, appointment_type, service_list_id, health_declaration_id } = req.body;
 
-  if (!patient_id || !dentist_id || !schedule_id || !timeslot_id || !status || !appointment_type || !service_list_id) {
-    return errorResponse(res, 'Missing required fields.', null, 400);
+  // ✅ Validate required fields
+  if (!patient_id || !dentist_id || !schedule_id || !timeslot_id || !status || !appointment_type || !Array.isArray(service_list_id) || service_list_id.length === 0) {
+    return errorResponse(res, 'Missing required fields or invalid service list.', null, 400);
   }
 
-  const sql = `
-    UPDATE appointments
-    SET patient_id = ?, dentist_id = ?, schedule_id = ?, timeslot_id = ?, status = ?, appointment_type = ?, service_list_id = ?
-    WHERE id = ?
-  `;
-  db.query(sql, [patient_id, dentist_id, schedule_id, timeslot_id, status, appointment_type, service_list_id, id], (err, results) => {
-    if (err) {
-      return errorResponse(res, 'Error updating appointment.', err.message, 500);
-    }
-    if (results.affectedRows === 0) {
+  try {
+    await db.promise().beginTransaction(); // ✅ Start transaction
+
+    // ✅ Step 1: Check if the appointment exists
+    const [appointmentCheck] = await db.promise().query(
+      `SELECT * FROM appointments WHERE id = ?`, [id]
+    );
+
+    if (appointmentCheck.length === 0) {
+      await db.promise().rollback();
       return errorResponse(res, 'Appointment not found.', null, 404);
     }
-    successResponse(res, 'Appointment updated successfully.');
-  });
+
+    // ✅ Step 2: Fetch latest health declaration if not provided
+    if (!health_declaration_id) {
+      const [healthResults] = await db.promise().query(
+        `SELECT id FROM health_declarations WHERE patient_id = ? ORDER BY created_at DESC LIMIT 1`,
+        [patient_id]
+      );
+
+      if (healthResults.length === 0) {
+        await db.promise().rollback();
+        return errorResponse(res, 'Health declaration is required before updating an appointment.', null, 400);
+      }
+
+      health_declaration_id = healthResults[0].id; // ✅ Automatically use the latest health declaration
+    }
+
+    // ✅ Step 3: Update the appointment
+    const updateAppointmentSql = `
+      UPDATE appointments 
+      SET patient_id = ?, dentist_id = ?, schedule_id = ?, timeslot_id = ?, status = ?, appointment_type = ?, health_declaration_id = ?
+      WHERE id = ?
+    `;
+    await db.promise().query(updateAppointmentSql, [
+      patient_id, dentist_id, schedule_id, timeslot_id, status, appointment_type, health_declaration_id, id
+    ]);
+
+    // ✅ Step 4: Remove old services and insert new ones
+    await db.promise().query(`DELETE FROM appointment_services WHERE appointment_id = ?`, [id]);
+
+    const serviceSql = `INSERT INTO appointment_services (appointment_id, service_list_id) VALUES ?`;
+    const serviceValues = service_list_id.map(serviceId => [id, serviceId]);
+
+    await db.promise().query(serviceSql, [serviceValues]);
+
+    // ✅ Step 5: Commit transaction
+    await db.promise().commit();
+
+    successResponse(res, 'Appointment updated successfully.', { appointmentId: id });
+
+  } catch (error) {
+    await db.promise().rollback(); // 🔹 Rollback transaction on error
+    errorResponse(res, 'Error updating appointment.', error.message, 500);
+  }
 });
 
+
+
 /**
- * Delete an appointment
+ * ✅ Delete an appointment
  */
 router.delete('/:id', verifyToken, (req, res) => {
   const { id } = req.params;
 
-  db.query('DELETE FROM appointments WHERE id = ?', [id], (err, results) => {
+  db.beginTransaction(async (err) => {
+    if (err) return errorResponse(res, 'Transaction start failed.', err.message, 500);
+
+    try {
+      // Delete services first to avoid foreign key constraint errors
+      await db.promise().query('DELETE FROM appointment_services WHERE appointment_id = ?', [id]);
+
+      // Delete the appointment
+      const [results] = await db.promise().query('DELETE FROM appointments WHERE id = ?', [id]);
+
+      if (results.affectedRows === 0) {
+        return db.rollback(() => errorResponse(res, 'Appointment not found.', null, 404));
+      }
+
+      db.commit((commitErr) => {
+        if (commitErr) {
+          return db.rollback(() => errorResponse(res, 'Error committing transaction.', commitErr.message, 500));
+        }
+        successResponse(res, 'Appointment deleted successfully.', null);
+      });
+
+    } catch (error) {
+      db.rollback(() => errorResponse(res, 'Error deleting appointment.', error.message, 500));
+    }
+  });
+});
+
+/**
+ * ✅ Get a specific appointment by Patient ID
+ */
+router.get('/by-patient/:patient_id', verifyToken, (req, res) => {
+  const { patient_id } = req.params;
+
+  db.query('SELECT * FROM appointments WHERE patient_id = ? ORDER BY created_at DESC LIMIT 1', [patient_id], (err, results) => {
     if (err) {
-      return errorResponse(res, 'Error deleting appointment.', err.message, 500);
+      return errorResponse(res, 'Error fetching appointment by patient ID.', err.message, 500);
+    }
+    if (results.length === 0) {
+      return errorResponse(res, 'No appointment found for this patient.', null, 404);
+    }
+    successResponse(res, 'Appointment retrieved successfully.', results[0]);
+  });
+});
+
+/**
+ * ✅ Cancel Appointment
+ */
+router.patch('/cancel/:appointment_id', verifyToken, (req, res) => {
+  const { appointment_id } = req.params;
+
+  const sql = `UPDATE appointments SET status = 'canceled' WHERE id = ?`;
+
+  db.query(sql, [appointment_id], (err, result) => {
+    if (err) {
+      return errorResponse(res, 'Error canceling appointment.', err.message, 500);
     }
 
-    if (results.affectedRows === 0) {
+    if (result.affectedRows === 0) {
       return errorResponse(res, 'Appointment not found.', null, 404);
     }
 
-    // Return a success message
-    successResponse(res, 'Appointment deleted successfully.', null);
+    successResponse(res, 'Appointment canceled successfully.', { appointment_id });
   });
+});
+
+/**
+ * ✅ Get all detailed appointments for a patient (Including Services)
+ */
+router.get("/getAllAppointmentsWithServicesByPatientId/:patient_id", verifyToken, (req, res) => {
+  const { patient_id } = req.params;
+
+  const sql = `
+    SELECT 
+      a.id AS appointment_id,
+      a.status,
+      a.appointment_type,
+      s.date AS schedule_date,
+      t.start_time AS timeslot_start_time,
+      t.end_time AS timeslot_end_time,
+      u.fullname AS dentist_name,  -- Fetch dentist name from users
+      p.fullname AS patient_name,  -- Fetch patient name from users
+      sv.id AS service_id,
+      sv.service_name
+    FROM appointments a
+    JOIN schedules s ON a.schedule_id = s.id
+    JOIN timeslots t ON a.timeslot_id = t.id
+    JOIN dentists d ON a.dentist_id = d.id
+    JOIN users u ON d.id = u.id  -- Fetch dentist's name
+    JOIN users p ON a.patient_id = p.id  -- Fetch patient name
+    LEFT JOIN appointment_services aps ON a.id = aps.appointment_id
+    LEFT JOIN serviceslist sv ON aps.service_list_id = sv.id
+    WHERE a.patient_id = ?
+    ORDER BY a.created_at DESC;
+  `;
+
+  db.query(sql, [patient_id], (err, results) => {
+    if (err) {
+      return errorResponse(res, "Error fetching detailed appointments.", err.message, 500);
+    }
+
+    if (results.length === 0) {
+      return successResponse(res, "No appointments found for this patient.", []);
+    }
+
+    // ✅ Group results by appointment_id to handle multiple services per appointment
+    const groupedAppointments = results.reduce((acc, row) => {
+      const { 
+        appointment_id, status, appointment_type, schedule_date, timeslot_start_time, timeslot_end_time, 
+        dentist_name, patient_name, service_id, service_name 
+      } = row;
+
+      if (!acc[appointment_id]) {
+        acc[appointment_id] = {
+          appointment_id,
+          status,
+          appointment_type,
+          schedule_date,
+          timeslot_start_time,
+          timeslot_end_time,
+          dentist_name,
+          patient_name,
+          services: []
+        };
+      }
+
+      if (service_id) {
+        acc[appointment_id].services.push({ service_id, service_name });
+      }
+
+      return acc;
+    }, {});
+
+    successResponse(res, "Detailed appointments retrieved successfully.", Object.values(groupedAppointments));
+  });
+
 });
 
 
