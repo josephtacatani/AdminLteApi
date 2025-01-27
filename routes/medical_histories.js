@@ -7,9 +7,6 @@ const router = express.Router();
 /**
  * Get all medical histories
  */
-/**
- * Get all medical histories
- */
 router.get('/', verifyToken, (req, res) => {
   db.query('SELECT * FROM medical_histories', (err, results) => {
     if (err) {
@@ -17,6 +14,23 @@ router.get('/', verifyToken, (req, res) => {
     }
     if (results.length === 0) {
       return successResponse(res, 'No medical histories found.', []);
+    }
+    successResponse(res, 'Medical histories retrieved successfully.', results);
+  });
+});
+
+/**
+ * Get all medical histories by Patient ID
+ */
+router.get('/by-patient/:patient_id', verifyToken, (req, res) => {
+  const { patient_id } = req.params;
+
+  db.query('SELECT * FROM medical_histories WHERE patient_id = ?', [patient_id], (err, results) => {
+    if (err) {
+      return errorResponse(res, 'Error fetching medical histories for patient.', err.message, 500);
+    }
+    if (results.length === 0) {
+      return successResponse(res, 'No medical histories found for this patient.', []);
     }
     successResponse(res, 'Medical histories retrieved successfully.', results);
   });
@@ -32,17 +46,16 @@ router.get('/:id', verifyToken, (req, res) => {
       return errorResponse(res, 'Error fetching medical history.', err.message, 500);
     }
     if (results.length === 0) {
-      return successResponse(res, 'No medical history found with the given ID.', null);
+      return errorResponse(res, 'Medical history not found.', null, 404);
     }
     successResponse(res, 'Medical history retrieved successfully.', results[0]);
   });
 });
 
-
 /**
  * Create a new medical history
  */
-router.post('/', verifyToken, verifyRole('dentist' , 'staff' , 'admin'), (req, res) => {
+router.post('/', verifyToken, verifyRole('dentist', 'staff', 'admin'), (req, res) => {
   const { patient_id, question1, question2, question3, question4, question5, question6, question7, question8, question9, question10 } = req.body;
 
   if (!patient_id) {
@@ -64,7 +77,7 @@ router.post('/', verifyToken, verifyRole('dentist' , 'staff' , 'admin'), (req, r
 /**
  * Update a medical history
  */
-router.put('/:id', verifyToken,verifyRole('dentist' , 'staff' , 'admin'), (req, res) => {
+router.put('/:id', verifyToken, verifyRole('dentist', 'staff', 'admin'), (req, res) => {
   const { id } = req.params;
   const { patient_id, question1, question2, question3, question4, question5, question6, question7, question8, question9, question10 } = req.body;
 
@@ -89,7 +102,7 @@ router.put('/:id', verifyToken,verifyRole('dentist' , 'staff' , 'admin'), (req, 
 /**
  * Delete a medical history
  */
-router.delete('/:id', verifyRole('dentist' , 'staff' , 'admin'), (req, res) => {
+router.delete('/:id', verifyToken, verifyRole('dentist', 'staff', 'admin'), (req, res) => {
   const { id } = req.params;
 
   db.query('DELETE FROM medical_histories WHERE id = ?', [id], (err, results) => {
@@ -98,7 +111,7 @@ router.delete('/:id', verifyRole('dentist' , 'staff' , 'admin'), (req, res) => {
     } else if (results.affectedRows === 0) {
       return errorResponse(res, 'Medical history not found.', null, 404);
     }
-    successResponse(res, 'Medical history deleted successfully.', null, 204);
+    successResponse(res, 'Medical history deleted successfully.');
   });
 });
 

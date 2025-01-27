@@ -64,6 +64,36 @@
 
 /**
  * @swagger
+ * /dental_histories/by-patient/{patient_id}:
+ *   get:
+ *     summary: Get all dental histories by patient ID
+ *     tags: [DentalHistories]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: patient_id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: The ID of the patient
+ *     responses:
+ *       200:
+ *         description: List of dental histories for the given patient
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/DentalHistory'
+ *       404:
+ *         description: No dental history found for the patient
+ *       401:
+ *         description: Unauthorized - Token is missing or invalid
+ */
+
+/**
+ * @swagger
  * /dental_histories/{id}:
  *   get:
  *     summary: Get a specific dental history by ID
@@ -126,7 +156,7 @@
  *             schema:
  *               $ref: '#/components/schemas/DentalHistory'
  *       400:
- *         description: Validation error
+ *         description: Validation error - missing required fields
  *       401:
  *         description: Unauthorized - Token is missing or invalid
  */
@@ -151,14 +181,28 @@
  *       content:
  *         application/json:
  *           schema:
- *             $ref: '#/components/schemas/DentalHistory'
+ *             type: object
+ *             properties:
+ *               patient_id:
+ *                 type: integer
+ *                 description: ID of the patient
+ *                 example: 5
+ *               previous_dentist:
+ *                 type: string
+ *                 description: Name of the previous dentist
+ *                 example: "Dr. Jane Doe"
+ *               last_dentist_visit:
+ *                 type: string
+ *                 format: date
+ *                 description: Date of the last visit to the dentist
+ *                 example: "2025-01-01"
  *     responses:
  *       200:
  *         description: Dental history updated successfully
  *       404:
  *         description: Dental history not found
  *       400:
- *         description: Validation error
+ *         description: Validation error - missing required fields
  *       401:
  *         description: Unauthorized - Token is missing or invalid
  */

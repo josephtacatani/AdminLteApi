@@ -1,6 +1,6 @@
 const express = require('express');
 const db = require('../db'); // Database connection
-const { verifyToken } = require('../middlewares/auth'); // JWT middleware
+const { verifyToken, verifyRole } = require('../middlewares/auth'); // JWT middleware
 const { successResponse, errorResponse } = require('../utils/responseHelper'); // Envelope response helpers
 const router = express.Router();
 
@@ -14,6 +14,20 @@ router.get('/', verifyToken, (req, res) => {
     }
     if (results.length === 0) {
       return successResponse(res, 'No dental histories found.', []);
+    }
+    successResponse(res, 'Dental histories retrieved successfully.', results);
+  });
+});
+
+router.get('/by-patient/:patient_id', verifyToken, (req, res) => {
+  const { patient_id } = req.params;
+
+  db.query('SELECT * FROM dental_histories WHERE patient_id = ?', [patient_id], (err, results) => {
+    if (err) {
+      return errorResponse(res, 'Error fetching dental histories by patient ID.', err.message, 500);
+    }
+    if (results.length === 0) {
+      return successResponse(res, 'No dental histories found for this patient.', []);
     }
     successResponse(res, 'Dental histories retrieved successfully.', results);
   });
@@ -39,7 +53,7 @@ router.get('/:id', verifyToken, (req, res) => {
 /**
  * Create a new dental history
  */
-router.post('/', verifyToken, (req, res) => {
+router.post('/', verifyToken, verifyRole('dentist', 'staff', 'admin'), async (req, res) => {
   const { patient_id, previous_dentist, last_dentist_visit } = req.body;
 
   // Validate required fields
@@ -64,7 +78,7 @@ router.post('/', verifyToken, (req, res) => {
 /**
  * Update a dental history
  */
-router.put('/:id', verifyToken, (req, res) => {
+router.put('/:id', verifyToken, verifyRole('dentist', 'staff', 'admin'), async (req, res) => {
   const { id } = req.params;
   const { patient_id, previous_dentist, last_dentist_visit } = req.body;
 
@@ -92,7 +106,7 @@ router.put('/:id', verifyToken, (req, res) => {
 /**
  * Delete a dental history
  */
-router.delete('/:id', verifyToken, (req, res) => {
+router.delete('/:id', verifyToken, verifyRole('dentist', 'staff', 'admin'), async (req, res) => {
   const { id } = req.params;
 
   db.query('DELETE FROM dental_histories WHERE id = ?', [id], (err, results) => {
