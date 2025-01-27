@@ -1,0 +1,2324 @@
+
+/* ===== File: routes\admin.js ===== */
+const express = require('express');
+const bcrypt = require('bcrypt');
+const db = require('../db');
+const { verifyToken, verifyRole } = require('../middlewares/auth');
+const { successResponse, errorResponse } = require('../utils/responseHelper'); // Envelope response helpers
+
+const router = express.Router();
+
+/**
+ * Register a new admin (Super Admin only)
+ */
+router.post('/register', verifyToken, verifyRole('super_admin'), async (req, res) => {
+  const {
+    email,
+    password,
+    fullname,
+    photo,
+    birthday,
+    address,
+    gender,
+    contact_number,
+    role = 'admin', // Default role for this endpoint is admin
+  } = req.body;
+
+  try {
+    // Validate required fields
+    if (!email || !password || !fullname) {
+      return errorResponse(res, 'Validation failed. Missing required fields.', null, 400);
+    }
+
+    // Hash the password
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    // Insert the new admin into the database
+    const sql = `
+      INSERT INTO users (email, password, role, status, fullname, photo, birthday, address, gender, contact_number, email_verified)
+      VALUES (?, ?, ?, 'active', ?, ?, ?, ?, ?, ?, 1)
+    `;
+
+    db.query(
+      sql,
+      [email, hashedPassword, role, fullname, photo, birthday, address, gender, contact_number],
+      (err, results) => {
+        if (err) {
+          return errorResponse(res, 'Registration failed.', err.message, 500);
+        }
+
+        // Send a success response
+        successResponse(res, 'Admin registered successfully.', {
+          email,
+          role,
+          status: 'active',
+          fullname,
+          photo,
+          birthday,
+          address,
+          gender,
+          contact_number,
+          email_verified: true,
+        });
+      }
+    );
+  } catch (error) {
+    errorResponse(res, 'An error occurred during registration.', error.message, 500);
+  }
+});
+
+/**
+ * Get all admins (Super Admin only)
+ */
+router.get('/', verifyToken, verifyRole('super_admin'), (req, res) => {
+  const sql = `
+    SELECT 
+      id, email, fullname, photo, birthday, address, gender, contact_number, role, status, email_verified
+    FROM 
+      users
+    WHERE 
+      role = 'admin'
+  `;
+
+  db.query(sql, (err, results) => {
+    if (err) {
+      return errorResponse(res, 'Error fetching admins.', err.message, 500);
+    }
+
+    if (results.length === 0) {
+      return errorResponse(res, 'No admins found.', null, 404);
+    }
+
+    successResponse(res, 'Admins retrieved successfully.', results);
+  });
+});
+
+/**
+ * Get a specific admin by ID
+ */
+router.get('/:id', verifyToken, verifyRole('super_admin'), (req, res) => {
+  const { id } = req.params;
+
+  const sql = `
+    SELECT 
+      id, email, fullname, photo, birthday, address, gender, contact_number, role, status, email_verified
+    FROM 
+      users
+    WHERE 
+      id = ? AND role = 'admin'
+  `;
+
+  db.query(sql, [id], (err, results) => {
+    if (err) {
+      return errorResponse(res, 'Error fetching admin by ID.', err.message, 500);
+    }
+    if (results.length === 0) {
+      return errorResponse(res, 'Admin not found.', null, 404);
+    }
+
+    successResponse(res, 'Admin retrieved successfully.', results[0]);
+  });
+});
+
+/**
+ * Update a specific admin (Super Admin only)
+ */
+router.put('/:id', verifyToken, verifyRole('super_admin'), (req, res) => {
+  const { id: pathId } = req.params;
+  const {
+    id: bodyId,
+    fullname,
+    photo,
+    birthday,
+    address,
+    gender,
+    contact_number,
+  } = req.body;
+
+  // Ensure the ID in the body matches the ID in the path
+  if (parseInt(pathId) !== parseInt(bodyId)) {
+    return errorResponse(res, 'Path ID and body ID do not match.', null, 400);
+  }
+
+  const sql = `
+    UPDATE users 
+    SET fullname = ?, photo = ?, birthday = ?, address = ?, gender = ?, contact_number = ?
+    WHERE id = ? AND role = 'admin'
+  `;
+
+  db.query(
+    sql,
+    [fullname, photo, birthday, address, gender, contact_number, pathId],
+    (err, results) => {
+      if (err) {
+        return errorResponse(res, 'Error updating admin details.', err.message, 500);
+      }
+      if (results.affectedRows === 0) {
+        return errorResponse(res, 'Admin not found.', null, 404);
+      }
+
+      successResponse(res, 'Admin details updated successfully.', null);
+    }
+  );
+});
+
+/**
+ * Delete a specific admin (Super Admin only)
+ */
+router.delete('/:id', verifyToken, verifyRole('super_admin'), (req, res) => {
+  const { id } = req.params;
+
+  const sql = `DELETE FROM users WHERE id = ? AND role = 'admin'`;
+
+  db.query(sql, [id], (err, results) => {
+    if (err) {
+      return errorResponse(res, 'Error deleting admin.', err.message, 500);
+    }
+    if (results.affectedRows === 0) {
+      return errorResponse(res, 'Admin not found.', null, 404);
+    }
+
+    successResponse(res, 'Admin deleted successfully.', null);
+  });
+});
+
+router.put('/reset-password/:id', verifyToken, verifyRole('admin', 'super_admin'), async (req, res) => {
+    const { id } = req.params;
+    const { newPassword } = req.body;
+  
+    // Validate input
+    if (!newPassword) {
+      return errorResponse(res, 'Validation failed. Missing required fields.', null, 400);
+    }
+  
+    try {
+      // Hash the new password
+      const hashedPassword = await bcrypt.hash(newPassword, 10);
+  
+      // Update the user's password in the database
+      const sql = `
+        UPDATE users
+        SET password = ?
+        WHERE id = ?
+      `;
+  
+      db.query(sql, [hashedPassword, id], (err, results) => {
+        if (err) {
+          return errorResponse(res, 'Error resetting password.', err.message, 500);
+        }
+  
+        if (results.affectedRows === 0) {
+          return errorResponse(res, 'User not found.', null, 404);
+        }
+  
+        successResponse(res, 'Password reset successfully.', null);
+      });
+    } catch (error) {
+      errorResponse(res, 'An error occurred while resetting password.', error.message, 500);
+    }
+  });
+
+module.exports = router;
+
+
+/* ===== File: routes\appointments.js ===== */
+const express = require('express');
+const db = require('../db'); // Database connection
+const { verifyToken } = require('../middlewares/auth'); // JWT middleware
+const { successResponse, errorResponse } = require('../utils/responseHelper'); // Envelope response helpers
+const router = express.Router();
+
+/**
+ * ✅ Get all appointments
+ */
+router.get('/', verifyToken, (req, res) => {
+  db.query('SELECT * FROM appointments', (err, results) => {
+    if (err) {
+      return errorResponse(res, 'Error fetching appointments.', err.message, 500);
+    }
+    if (results.length === 0) {
+      return successResponse(res, 'No appointments found.', []);
+    }
+    successResponse(res, 'Appointments retrieved successfully.', results);
+  });
+});
+
+/**
+ * ✅ Get a specific appointment by ID
+ */
+router.get('/:id', verifyToken, (req, res) => {
+  const { id } = req.params;
+  db.query('SELECT * FROM appointments WHERE id = ?', [id], (err, results) => {
+    if (err) {
+      return errorResponse(res, 'Error fetching appointment.', err.message, 500);
+    }
+    if (results.length === 0) {
+      return errorResponse(res, 'Appointment not found.', null, 404);
+    }
+    successResponse(res, 'Appointment retrieved successfully.', results[0]);
+  });
+});
+
+/**
+ * ✅ Create a new appointment (With Services and Transactions)
+ */
+router.post('/', verifyToken, async (req, res) => {
+  let { patient_id, dentist_id, schedule_id, timeslot_id, status, appointment_type, service_list_id, health_declaration_id } = req.body;
+
+  // ✅ Validate required fields
+  if (!patient_id || !dentist_id || !schedule_id || !timeslot_id || !status || !appointment_type || !Array.isArray(service_list_id) || service_list_id.length === 0) {
+    return errorResponse(res, 'Missing required fields or invalid service list.', null, 400);
+  }
+
+  try {
+    await db.promise().beginTransaction(); // ✅ Start transaction
+
+    // ✅ Step 1: Fetch latest health declaration if not provided
+    if (!health_declaration_id) {
+      const [healthResults] = await db.promise().query(
+        `SELECT id FROM health_declarations WHERE patient_id = ? ORDER BY created_at DESC LIMIT 1`,
+        [patient_id]
+      );
+
+      if (healthResults.length === 0) {
+        await db.promise().rollback();
+        return errorResponse(res, 'Health declaration is required before booking an appointment.', null, 400);
+      }
+
+      health_declaration_id = healthResults[0].id; // ✅ Automatically use the latest health declaration
+    }
+
+    // ✅ Step 2: Insert the appointment
+    const appointmentSql = `
+      INSERT INTO appointments (patient_id, dentist_id, schedule_id, timeslot_id, status, appointment_type, health_declaration_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `;
+    const [appointmentResult] = await db.promise().query(appointmentSql, [
+      patient_id, dentist_id, schedule_id, timeslot_id, status, appointment_type, health_declaration_id
+    ]);
+
+    const appointmentId = appointmentResult.insertId;
+
+    // ✅ Step 3: Insert multiple services into `appointment_services`
+    const serviceSql = `INSERT INTO appointment_services (appointment_id, service_list_id) VALUES ?`;
+    const serviceValues = service_list_id.map(serviceId => [appointmentId, serviceId]);
+
+    await db.promise().query(serviceSql, [serviceValues]);
+
+    // ✅ Step 4: Commit transaction
+    await db.promise().commit();
+
+    successResponse(res, 'Appointment created successfully.', { appointmentId });
+
+  } catch (error) {
+    await db.promise().rollback(); // 🔹 Rollback transaction on error
+    errorResponse(res, 'Error creating appointment.', error.message, 500);
+  }
+});
+
+
+/**
+ * ✅ Update an existing appointment (With Services and Transactions)
+ */
+router.put('/:id', verifyToken, async (req, res) => {
+  const { id } = req.params;
+  let { patient_id, dentist_id, schedule_id, timeslot_id, status, appointment_type, service_list_id, health_declaration_id } = req.body;
+
+  // ✅ Validate required fields
+  if (!patient_id || !dentist_id || !schedule_id || !timeslot_id || !status || !appointment_type || !Array.isArray(service_list_id) || service_list_id.length === 0) {
+    return errorResponse(res, 'Missing required fields or invalid service list.', null, 400);
+  }
+
+  try {
+    await db.promise().beginTransaction(); // ✅ Start transaction
+
+    // ✅ Step 1: Check if the appointment exists
+    const [appointmentCheck] = await db.promise().query(
+      `SELECT * FROM appointments WHERE id = ?`, [id]
+    );
+
+    if (appointmentCheck.length === 0) {
+      await db.promise().rollback();
+      return errorResponse(res, 'Appointment not found.', null, 404);
+    }
+
+    // ✅ Step 2: Fetch latest health declaration if not provided
+    if (!health_declaration_id) {
+      const [healthResults] = await db.promise().query(
+        `SELECT id FROM health_declarations WHERE patient_id = ? ORDER BY created_at DESC LIMIT 1`,
+        [patient_id]
+      );
+
+      if (healthResults.length === 0) {
+        await db.promise().rollback();
+        return errorResponse(res, 'Health declaration is required before updating an appointment.', null, 400);
+      }
+
+      health_declaration_id = healthResults[0].id; // ✅ Automatically use the latest health declaration
+    }
+
+    // ✅ Step 3: Update the appointment
+    const updateAppointmentSql = `
+      UPDATE appointments 
+      SET patient_id = ?, dentist_id = ?, schedule_id = ?, timeslot_id = ?, status = ?, appointment_type = ?, health_declaration_id = ?
+      WHERE id = ?
+    `;
+    await db.promise().query(updateAppointmentSql, [
+      patient_id, dentist_id, schedule_id, timeslot_id, status, appointment_type, health_declaration_id, id
+    ]);
+
+    // ✅ Step 4: Remove old services and insert new ones
+    await db.promise().query(`DELETE FROM appointment_services WHERE appointment_id = ?`, [id]);
+
+    const serviceSql = `INSERT INTO appointment_services (appointment_id, service_list_id) VALUES ?`;
+    const serviceValues = service_list_id.map(serviceId => [id, serviceId]);
+
+    await db.promise().query(serviceSql, [serviceValues]);
+
+    // ✅ Step 5: Commit transaction
+    await db.promise().commit();
+
+    successResponse(res, 'Appointment updated successfully.', { appointmentId: id });
+
+  } catch (error) {
+    await db.promise().rollback(); // 🔹 Rollback transaction on error
+    errorResponse(res, 'Error updating appointment.', error.message, 500);
+  }
+});
+
+
+
+/**
+ * ✅ Delete an appointment
+ */
+router.delete('/:id', verifyToken, (req, res) => {
+  const { id } = req.params;
+
+  db.beginTransaction(async (err) => {
+    if (err) return errorResponse(res, 'Transaction start failed.', err.message, 500);
+
+    try {
+      // Delete services first to avoid foreign key constraint errors
+      await db.promise().query('DELETE FROM appointment_services WHERE appointment_id = ?', [id]);
+
+      // Delete the appointment
+      const [results] = await db.promise().query('DELETE FROM appointments WHERE id = ?', [id]);
+
+      if (results.affectedRows === 0) {
+        return db.rollback(() => errorResponse(res, 'Appointment not found.', null, 404));
+      }
+
+      db.commit((commitErr) => {
+        if (commitErr) {
+          return db.rollback(() => errorResponse(res, 'Error committing transaction.', commitErr.message, 500));
+        }
+        successResponse(res, 'Appointment deleted successfully.', null);
+      });
+
+    } catch (error) {
+      db.rollback(() => errorResponse(res, 'Error deleting appointment.', error.message, 500));
+    }
+  });
+});
+
+/**
+ * ✅ Get a specific appointment by Patient ID
+ */
+router.get('/by-patient/:patient_id', verifyToken, (req, res) => {
+  const { patient_id } = req.params;
+
+  db.query('SELECT * FROM appointments WHERE patient_id = ? ORDER BY created_at DESC LIMIT 1', [patient_id], (err, results) => {
+    if (err) {
+      return errorResponse(res, 'Error fetching appointment by patient ID.', err.message, 500);
+    }
+    if (results.length === 0) {
+      return errorResponse(res, 'No appointment found for this patient.', null, 404);
+    }
+    successResponse(res, 'Appointment retrieved successfully.', results[0]);
+  });
+});
+
+/**
+ * ✅ Cancel Appointment
+ */
+router.patch('/cancel/:appointment_id', verifyToken, (req, res) => {
+  const { appointment_id } = req.params;
+
+  const sql = `UPDATE appointments SET status = 'canceled' WHERE id = ?`;
+
+  db.query(sql, [appointment_id], (err, result) => {
+    if (err) {
+      return errorResponse(res, 'Error canceling appointment.', err.message, 500);
+    }
+
+    if (result.affectedRows === 0) {
+      return errorResponse(res, 'Appointment not found.', null, 404);
+    }
+
+    successResponse(res, 'Appointment canceled successfully.', { appointment_id });
+  });
+});
+
+/**
+ * ✅ Get all detailed appointments for a patient (Including Services)
+ */
+router.get("/getAllAppointmentsWithServicesByPatientId/:patient_id", verifyToken, (req, res) => {
+  const { patient_id } = req.params;
+
+  const sql = `
+    SELECT 
+      a.id AS appointment_id,
+      a.status,
+      a.appointment_type,
+      s.date AS schedule_date,
+      t.start_time AS timeslot_start_time,
+      t.end_time AS timeslot_end_time,
+      u.fullname AS dentist_name,  -- Fetch dentist name from users
+      p.fullname AS patient_name,  -- Fetch patient name from users
+      sv.id AS service_id,
+      sv.service_name
+    FROM appointments a
+    JOIN schedules s ON a.schedule_id = s.id
+    JOIN timeslots t ON a.timeslot_id = t.id
+    JOIN dentists d ON a.dentist_id = d.id
+    JOIN users u ON d.id = u.id  -- Fetch dentist's name
+    JOIN users p ON a.patient_id = p.id  -- Fetch patient name
+    LEFT JOIN appointment_services aps ON a.id = aps.appointment_id
+    LEFT JOIN serviceslist sv ON aps.service_list_id = sv.id
+    WHERE a.patient_id = ?
+    ORDER BY a.created_at DESC;
+  `;
+
+  db.query(sql, [patient_id], (err, results) => {
+    if (err) {
+      return errorResponse(res, "Error fetching detailed appointments.", err.message, 500);
+    }
+
+    if (results.length === 0) {
+      return successResponse(res, "No appointments found for this patient.", []);
+    }
+
+    // ✅ Group results by appointment_id to handle multiple services per appointment
+    const groupedAppointments = results.reduce((acc, row) => {
+      const { 
+        appointment_id, status, appointment_type, schedule_date, timeslot_start_time, timeslot_end_time, 
+        dentist_name, patient_name, service_id, service_name 
+      } = row;
+
+      if (!acc[appointment_id]) {
+        acc[appointment_id] = {
+          appointment_id,
+          status,
+          appointment_type,
+          schedule_date,
+          timeslot_start_time,
+          timeslot_end_time,
+          dentist_name,
+          patient_name,
+          services: []
+        };
+      }
+
+      if (service_id) {
+        acc[appointment_id].services.push({ service_id, service_name });
+      }
+
+      return acc;
+    }, {});
+
+    successResponse(res, "Detailed appointments retrieved successfully.", Object.values(groupedAppointments));
+  });
+
+});
+
+
+module.exports = router;
+
+
+/* ===== File: routes\auth.js ===== */
+const express = require('express');
+const jwt = require('jsonwebtoken');
+const bcrypt = require('bcrypt');
+const db = require('../db'); // Database connection
+const sendEmail = require('../utils/email');
+const router = express.Router();
+const nodemailer = require('nodemailer');
+
+// ✅ LOGIN ROUTE
+router.post('/login', async (req, res) => {
+  const { email, password } = req.body;
+
+  if (!email || !password) {
+    return res.status(400).json({ message: "Email and password are required.", data: null });
+  }
+
+  try {
+    db.query('SELECT * FROM users WHERE email = ?', [email], async (err, results) => {
+      if (err) {
+        return res.status(500).json({ message: "Database query failed.", data: null });
+      }
+
+      const user = results[0];
+      if (!user || !(await bcrypt.compare(password, user.password))) {
+        return res.status(401).json({ message: "Invalid credentials.", data: null });
+      }
+
+      if (!user.email_verified) {
+        return res.status(403).json({ message: "Email is not verified. Please verify your email to log in.", data: null });
+      }
+
+      const accessToken = jwt.sign({ id: user.id, role: user.role }, process.env.ACCESS_TOKEN_SECRET, { expiresIn: "15m" });
+      const refreshToken = jwt.sign({ id: user.id, role: user.role }, process.env.REFRESH_TOKEN_SECRET, { expiresIn: "7d" });
+
+      db.query('UPDATE users SET refresh_token = ? WHERE id = ?', [refreshToken, user.id], (updateErr) => {
+        if (updateErr) {
+          return res.status(500).json({ message: "Failed to save refresh token.", data: null });
+        }
+
+        res.status(200).json({
+          message: "Login successful.",
+          data: { accessToken, refreshToken },
+        });
+      });
+    });
+  } catch (error) {
+    res.status(500).json({ message: "An error occurred during login.", data: null });
+  }
+});
+
+// ✅ REGISTER ROUTE
+router.post('/register', async (req, res) => {
+  const { email, password, role, status = 'pending', fullname, photo, birthday, address, gender, contact_number } = req.body;
+
+  try {
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    db.query(
+      `INSERT INTO users (email, password, role, status, fullname, photo, birthday, address, gender, contact_number, email_verified)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`,
+      [email, hashedPassword, role, status, fullname, photo, birthday, address, gender, contact_number],
+      async (err, results) => {
+        if (err) {
+          return res.status(500).json({ message: "Database error during registration.", data: null });
+        }
+
+        const verificationToken = jwt.sign({ id: results.insertId, email }, process.env.ACCESS_TOKEN_SECRET, { expiresIn: "1d" });
+
+        const verificationLink = `http://localhost:${process.env.PORT || 8082}/auth/verify-email?token=${verificationToken}`;
+
+        try {
+          await sendEmail(email, "Verify your email", `<p>Click the link to verify: <a href="${verificationLink}">${verificationLink}</a></p>`);
+
+          res.status(201).json({
+            message: "Registration successful. Please check your email to verify your account.",
+            data: { id: results.insertId, email, role, status },
+          });
+        } catch (emailError) {
+          res.status(500).json({ message: "Registration successful, but failed to send verification email.", data: null });
+        }
+      }
+    );
+  } catch (error) {
+    res.status(500).json({ message: "An unexpected error occurred.", data: null });
+  }
+});
+
+// ✅ REFRESH TOKEN ROUTE
+router.post('/refresh-token', (req, res) => {
+  const { refreshToken } = req.body;
+
+  if (!refreshToken) return res.status(400).json({ message: "Refresh token is required.", data: null });
+
+  jwt.verify(refreshToken, process.env.REFRESH_TOKEN_SECRET, (err, decoded) => {
+    if (err) return res.status(403).json({ message: "Invalid or expired refresh token.", data: null });
+
+    const newAccessToken = jwt.sign({ id: decoded.id, role: decoded.role }, process.env.ACCESS_TOKEN_SECRET, { expiresIn: "15m" });
+
+    res.status(200).json({
+      message: "Access token refreshed successfully.",
+      data: { accessToken: newAccessToken },
+    });
+  });
+});
+
+// ✅ LOGOUT ROUTE
+router.post('/logout', (req, res) => {
+  const { refreshToken } = req.body;
+
+  if (!refreshToken) {
+    return res.status(400).json({ message: "Refresh token is required.", data: null });
+  }
+
+  db.query('UPDATE users SET refresh_token = NULL WHERE refresh_token = ?', [refreshToken], (err, results) => {
+    if (err) {
+      return res.status(500).json({ message: "Database query failed.", data: null });
+    }
+
+    if (results.affectedRows === 0) {
+      return res.status(401).json({ message: "Invalid refresh token.", data: null });
+    }
+
+    res.status(200).json({ message: "Logout successful.", data: null });
+  });
+});
+
+// ✅ VERIFY EMAIL ROUTE
+router.get('/verify-email', (req, res) => {
+  const { token } = req.query;
+
+  if (!token) {
+    return res.status(400).json({ message: "Token is required.", data: null });
+  }
+
+  jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decoded) => {
+    if (err) {
+      return res.status(400).json({ message: "Invalid or expired token.", data: null });
+    }
+
+    db.query('UPDATE users SET email_verified = 1, status = "active" WHERE id = ?', [decoded.id], (err) => {
+      if (err) {
+        return res.status(500).json({ message: "Database update failed.", data: null });
+      }
+
+      res.status(200).json({
+        message: "Email verified successfully. Your account is now active.",
+        data: null,
+      });
+    });
+  });
+});
+
+module.exports = router;
+
+
+/* ===== File: routes\dental_histories.js ===== */
+const express = require('express');
+const db = require('../db'); // Database connection
+const { verifyToken } = require('../middlewares/auth'); // JWT middleware
+const { successResponse, errorResponse } = require('../utils/responseHelper'); // Envelope response helpers
+const router = express.Router();
+
+/**
+ * Get all dental histories
+ */
+router.get('/', verifyToken, (req, res) => {
+  db.query('SELECT * FROM dental_histories', (err, results) => {
+    if (err) {
+      return errorResponse(res, 'Error fetching dental histories.', err.message, 500);
+    }
+    if (results.length === 0) {
+      return successResponse(res, 'No dental histories found.', []);
+    }
+    successResponse(res, 'Dental histories retrieved successfully.', results);
+  });
+});
+
+/**
+ * Get a specific dental history by ID
+ */
+router.get('/:id', verifyToken, (req, res) => {
+  const { id } = req.params;
+
+  db.query('SELECT * FROM dental_histories WHERE id = ?', [id], (err, results) => {
+    if (err) {
+      return errorResponse(res, 'Error fetching dental history.', err.message, 500);
+    }
+    if (results.length === 0) {
+      return errorResponse(res, 'Dental history not found.', null, 404);
+    }
+    successResponse(res, 'Dental history retrieved successfully.', results[0]);
+  });
+});
+
+/**
+ * Create a new dental history
+ */
+router.post('/', verifyToken, (req, res) => {
+  const { patient_id, previous_dentist, last_dentist_visit } = req.body;
+
+  // Validate required fields
+  if (!patient_id) {
+    return errorResponse(res, 'Patient ID is required.', null, 400);
+  }
+
+  const sql = `
+    INSERT INTO dental_histories (patient_id, previous_dentist, last_dentist_visit)
+    VALUES (?, ?, ?)
+  `;
+  db.query(sql, [patient_id, previous_dentist, last_dentist_visit], (err, results) => {
+    if (err) {
+      return errorResponse(res, 'Error creating dental history.', err.message, 500);
+    }
+
+    // Return the created dental history ID
+    successResponse(res, 'Dental history created successfully.', { id: results.insertId });
+  });
+});
+
+/**
+ * Update a dental history
+ */
+router.put('/:id', verifyToken, (req, res) => {
+  const { id } = req.params;
+  const { patient_id, previous_dentist, last_dentist_visit } = req.body;
+
+  // Validate required fields
+  if (!patient_id) {
+    return errorResponse(res, 'Patient ID is required.', null, 400);
+  }
+
+  const sql = `
+    UPDATE dental_histories
+    SET patient_id = ?, previous_dentist = ?, last_dentist_visit = ?
+    WHERE id = ?
+  `;
+  db.query(sql, [patient_id, previous_dentist, last_dentist_visit, id], (err, results) => {
+    if (err) {
+      return errorResponse(res, 'Error updating dental history.', err.message, 500);
+    }
+    if (results.affectedRows === 0) {
+      return errorResponse(res, 'Dental history not found.', null, 404);
+    }
+    successResponse(res, 'Dental history updated successfully.');
+  });
+});
+
+/**
+ * Delete a dental history
+ */
+router.delete('/:id', verifyToken, (req, res) => {
+  const { id } = req.params;
+
+  db.query('DELETE FROM dental_histories WHERE id = ?', [id], (err, results) => {
+    if (err) {
+      return errorResponse(res, 'Error deleting dental history.', err.message, 500);
+    }
+    if (results.affectedRows === 0) {
+      return errorResponse(res, 'Dental history not found.', null, 404);
+    }
+    successResponse(res, 'Dental history deleted successfully.', null);
+  });
+});
+
+module.exports = router;
+
+
+/* ===== File: routes\dentist.js ===== */
+const express = require('express');
+const bcrypt = require('bcrypt');
+const db = require('../db');
+const { verifyToken, verifyRole } = require('../middlewares/auth');
+
+const router = express.Router();
+
+/**
+ * ✅ Register a new dentist (Admin only)
+ */
+router.post('/register', verifyToken, verifyRole('admin'), async (req, res) => {
+  const {
+    email, password, fullname, photo, birthday, address,
+    gender, contact_number, degree, specialty
+  } = req.body;
+
+  try {
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    // Insert into `users` table
+    const userSql = `
+      INSERT INTO users (email, password, role, status, fullname, photo, birthday, address, gender, contact_number, email_verified)
+      VALUES (?, ?, 'dentist', 'active', ?, ?, ?, ?, ?, ?, 1)
+    `;
+
+    db.query(userSql, [email, hashedPassword, fullname, photo, birthday, address, gender, contact_number], (err, userResults) => {
+      if (err) {
+        return res.status(500).json({ message: "Registration failed.", data: null, error: err.message });
+      }
+
+      const userId = userResults.insertId;
+
+      // Insert into `dentists` table
+      const dentistSql = `INSERT INTO dentists (id, degree, specialty) VALUES (?, ?, ?)`;
+      db.query(dentistSql, [userId, degree, specialty], (dentistErr) => {
+        if (dentistErr) {
+          return res.status(500).json({ message: "Failed to register dentist.", data: null, error: dentistErr.message });
+        }
+
+        res.status(201).json({
+          message: "Dentist registered successfully.",
+          data: {
+            id: userId, email, fullname, status: 'active', degree, specialty, email_verified: 1
+          },
+          error: null
+        });
+      });
+    });
+
+  } catch (error) {
+    res.status(500).json({ message: "An error occurred during registration.", data: null, error: error.message });
+  }
+});
+
+/**
+ * ✅ Get all dentists
+ */
+router.get('/', verifyToken, (req, res) => {
+  const sql = `
+    SELECT 
+      users.id AS user_id, users.email, users.fullname, users.status,
+      users.photo, users.birthday, users.address, users.gender, 
+      users.contact_number, dentists.degree, dentists.specialty
+    FROM users
+    LEFT JOIN dentists ON users.id = dentists.id
+    WHERE users.role = 'dentist'
+  `;
+
+  db.query(sql, (err, results) => {
+    if (err) {
+      return res.status(500).json({ message: "Error fetching dentists.", data: null, error: err.message });
+    }
+    res.status(200).json({ message: "Dentists retrieved successfully.", data: results, error: null });
+  });
+});
+
+/**
+ * ✅ Get a specific dentist by ID
+ */
+router.get('/:id', verifyToken, (req, res) => {
+  const { id } = req.params;
+
+  // Ensure the ID is a valid number
+  if (isNaN(id)) {
+    return res.status(400).json({ message: "Invalid dentist ID.", data: null, error: null });
+  }
+
+  const sql = `
+    SELECT 
+      users.id AS user_id, users.email, users.fullname, users.status,
+      users.photo, users.birthday, users.address, users.gender, 
+      users.contact_number, dentists.degree, dentists.specialty
+    FROM users
+    LEFT JOIN dentists ON users.id = dentists.id
+    WHERE users.id = ? AND users.role = 'dentist' -- ✅ Ensures only dentists are retrieved
+  `;
+
+  db.query(sql, [id], (err, results) => {
+    if (err) {
+      return res.status(500).json({ message: "Error fetching dentist by ID.", data: null, error: err.message });
+    }
+    if (!results.length) {
+      return res.status(404).json({ message: "Dentist not found.", data: null, error: null });
+    }
+    res.status(200).json({ message: "Dentist retrieved successfully.", data: results[0], error: null });
+  });
+});
+
+
+/**
+ * ✅ Update a dentist's details
+ */
+router.put('/:id', verifyToken, verifyRole('admin', 'dentist'), (req, res) => {
+  const { id } = req.params;
+  const { fullname, photo, birthday, address, gender, contact_number, degree, specialty } = req.body;
+
+  if (isNaN(id)) {
+    return res.status(400).json({ message: "Invalid dentist ID.", data: null, error: null });
+  }
+
+  const updateUserSql = `
+    UPDATE users 
+    SET fullname = ?, photo = ?, birthday = ?, address = ?, gender = ?, contact_number = ?
+    WHERE id = ?
+  `;
+
+  db.query(updateUserSql, [fullname, photo, birthday, address, gender, contact_number, id], (userErr, userResults) => {
+    if (userErr) {
+      return res.status(500).json({ message: "Error updating dentist details.", data: null, error: userErr.message });
+    }
+    if (userResults.affectedRows === 0) {
+      return res.status(404).json({ message: "Dentist not found.", data: null, error: null });
+    }
+
+    const updateDentistSql = `UPDATE dentists SET degree = ?, specialty = ? WHERE id = ?`;
+    db.query(updateDentistSql, [degree, specialty, id], (dentistErr) => {
+      if (dentistErr) {
+        return res.status(500).json({ message: "Error updating dentist specialization.", data: null, error: dentistErr.message });
+      }
+
+      res.status(200).json({ message: "Dentist details updated successfully.", data: null, error: null });
+    });
+  });
+});
+
+/**
+ * ✅ Delete a dentist (Admin only)
+ */
+router.delete('/:id', verifyToken, verifyRole('admin'), (req, res) => {
+  const { id } = req.params;
+
+  if (isNaN(id)) {
+    return res.status(400).json({ message: "Invalid dentist ID.", data: null, error: null });
+  }
+
+  const sql = `DELETE FROM users WHERE id = ?`;
+
+  db.query(sql, [id], (err, results) => {
+    if (err) {
+      return res.status(500).json({ message: "Error deleting dentist.", data: null, error: err.message });
+    }
+    if (results.affectedRows === 0) {
+      return res.status(404).json({ message: "Dentist not found.", data: null, error: null });
+    }
+    res.status(200).json({ message: "Dentist deleted successfully.", data: null, error: null });
+  });
+});
+
+module.exports = router;
+
+
+/* ===== File: routes\health_declarations.js ===== */
+const express = require('express');
+const db = require('../db'); // Database connection
+const { verifyToken } = require('../middlewares/auth'); // JWT middleware
+const { successResponse, errorResponse } = require('../utils/responseHelper'); // Envelope response helpers
+const router = express.Router();
+
+/**
+ * Get all health declarations
+ */
+router.get('/', verifyToken, (req, res) => {
+  db.query('SELECT * FROM health_declarations', (err, results) => {
+    if (err) {
+      return errorResponse(res, 'Error fetching health declarations.', err.message, 500);
+    }
+    if (results.length === 0) {
+      return successResponse(res, 'No health declarations found.', []);
+    }
+    successResponse(res, 'Health declarations retrieved successfully.', results);
+  });
+});
+
+/**
+ * Get a specific health declaration by ID
+ */
+router.get('/:id', verifyToken, (req, res) => {
+  const { id } = req.params;
+  db.query('SELECT * FROM health_declarations WHERE id = ?', [id], (err, results) => {
+    if (err) {
+      return errorResponse(res, 'Error fetching health declaration.', err.message, 500);
+    }
+    if (results.length === 0) {
+      return errorResponse(res, 'Health declaration not found.', null, 404);
+    }
+    successResponse(res, 'Health declaration retrieved successfully.', results[0]);
+  });
+});
+
+/**
+ * Create a new health declaration
+ */
+router.post('/', verifyToken, (req, res) => {
+  const {
+    patient_id,
+    question1, question2, question3, question4,
+    question5, question6, question7, question8,
+    question9, question10, question11, question12,
+    question13, question14,
+  } = req.body;
+
+  // Validate required fields
+  if (!patient_id) {
+    return errorResponse(res, 'Patient ID is required.', null, 400);
+  }
+
+  const sql = `
+    INSERT INTO health_declarations (
+      patient_id, question1, question2, question3, question4, question5,
+      question6, question7, question8, question9, question10, question11,
+      question12, question13, question14
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `;
+  db.query(sql, [
+    patient_id, question1, question2, question3, question4, question5,
+    question6, question7, question8, question9, question10, question11,
+    question12, question13, question14,
+  ], (err, results) => {
+    if (err) {
+      return errorResponse(res, 'Error creating health declaration.', err.message, 500);
+    }
+
+    // Fetch the full record after insertion
+    const fetchSql = 'SELECT * FROM health_declarations WHERE id = ?';
+    db.query(fetchSql, [results.insertId], (fetchErr, fetchResults) => {
+      if (fetchErr) {
+        return errorResponse(res, 'Error fetching health declaration.', fetchErr.message, 500);
+      }
+      successResponse(res, 'Health declaration created successfully.', fetchResults[0]);
+    });
+  });
+});
+
+/**
+ * Update a health declaration
+ */
+router.put('/:id', verifyToken, (req, res) => {
+  const { id } = req.params;
+  const {
+    patient_id,
+    question1, question2, question3, question4,
+    question5, question6, question7, question8,
+    question9, question10, question11, question12,
+    question13, question14,
+  } = req.body;
+
+  if (!patient_id) {
+    return errorResponse(res, 'Patient ID is required.', null, 400);
+  }
+
+  const sql = `
+    UPDATE health_declarations SET
+      patient_id = ?, question1 = ?, question2 = ?, question3 = ?, question4 = ?,
+      question5 = ?, question6 = ?, question7 = ?, question8 = ?, question9 = ?,
+      question10 = ?, question11 = ?, question12 = ?, question13 = ?, question14 = ?
+    WHERE id = ?
+  `;
+  db.query(sql, [
+    patient_id, question1, question2, question3, question4,
+    question5, question6, question7, question8, question9,
+    question10, question11, question12, question13, question14, id,
+  ], (err, results) => {
+    if (err) {
+      return errorResponse(res, 'Error updating health declaration.', err.message, 500);
+    }
+    if (results.affectedRows === 0) {
+      return errorResponse(res, 'Health declaration not found.', null, 404);
+    }
+    successResponse(res, 'Health declaration updated successfully.');
+  });
+});
+
+/**
+ * Delete a health declaration
+ */
+router.delete('/:id', verifyToken, (req, res) => {
+  const { id } = req.params;
+
+  db.query('DELETE FROM health_declarations WHERE id = ?', [id], (err, results) => {
+    if (err) {
+      return errorResponse(res, 'Error deleting health declaration.', err.message, 500);
+    }
+    if (results.affectedRows === 0) {
+      return errorResponse(res, 'Health declaration not found.', null, 404);
+    }
+    successResponse(res, 'Health declaration deleted successfully.', null, 204);
+  });
+});
+
+module.exports = router;
+
+
+/* ===== File: routes\medical_histories.js ===== */
+const express = require('express');
+const db = require('../db'); // Database connection
+const { verifyToken, verifyRole } = require('../middlewares/auth'); // JWT middleware
+const { successResponse, errorResponse } = require('../utils/responseHelper'); // Envelope response helpers
+const router = express.Router();
+
+/**
+ * Get all medical histories
+ */
+/**
+ * Get all medical histories
+ */
+router.get('/', verifyToken, (req, res) => {
+  db.query('SELECT * FROM medical_histories', (err, results) => {
+    if (err) {
+      return errorResponse(res, 'Error fetching medical histories.', err.message, 500);
+    }
+    if (results.length === 0) {
+      return successResponse(res, 'No medical histories found.', []);
+    }
+    successResponse(res, 'Medical histories retrieved successfully.', results);
+  });
+});
+
+/**
+ * Get a specific medical history by ID
+ */
+router.get('/:id', verifyToken, (req, res) => {
+  const { id } = req.params;
+  db.query('SELECT * FROM medical_histories WHERE id = ?', [id], (err, results) => {
+    if (err) {
+      return errorResponse(res, 'Error fetching medical history.', err.message, 500);
+    }
+    if (results.length === 0) {
+      return successResponse(res, 'No medical history found with the given ID.', null);
+    }
+    successResponse(res, 'Medical history retrieved successfully.', results[0]);
+  });
+});
+
+
+/**
+ * Create a new medical history
+ */
+router.post('/', verifyToken, verifyRole('dentist' , 'staff' , 'admin'), (req, res) => {
+  const { patient_id, question1, question2, question3, question4, question5, question6, question7, question8, question9, question10 } = req.body;
+
+  if (!patient_id) {
+    return errorResponse(res, 'Patient ID is required.', null, 400);
+  }
+
+  const sql = `
+    INSERT INTO medical_histories (patient_id, question1, question2, question3, question4, question5, question6, question7, question8, question9, question10)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `;
+  db.query(sql, [patient_id, question1, question2, question3, question4, question5, question6, question7, question8, question9, question10], (err, results) => {
+    if (err) {
+      return errorResponse(res, 'Error creating medical history.', err.message, 500);
+    }
+    successResponse(res, 'Medical history created successfully.', { id: results.insertId });
+  });
+});
+
+/**
+ * Update a medical history
+ */
+router.put('/:id', verifyToken,verifyRole('dentist' , 'staff' , 'admin'), (req, res) => {
+  const { id } = req.params;
+  const { patient_id, question1, question2, question3, question4, question5, question6, question7, question8, question9, question10 } = req.body;
+
+  if (!patient_id) {
+    return errorResponse(res, 'Patient ID is required.', null, 400);
+  }
+
+  const sql = `
+    UPDATE medical_histories SET patient_id = ?, question1 = ?, question2 = ?, question3 = ?, question4 = ?, question5 = ?, question6 = ?, question7 = ?, question8 = ?, question9 = ?, question10 = ?
+    WHERE id = ?
+  `;
+  db.query(sql, [patient_id, question1, question2, question3, question4, question5, question6, question7, question8, question9, question10, id], (err, results) => {
+    if (err) {
+      return errorResponse(res, 'Error updating medical history.', err.message, 500);
+    } else if (results.affectedRows === 0) {
+      return errorResponse(res, 'Medical history not found.', null, 404);
+    }
+    successResponse(res, 'Medical history updated successfully.');
+  });
+});
+
+/**
+ * Delete a medical history
+ */
+router.delete('/:id', verifyRole('dentist' , 'staff' , 'admin'), (req, res) => {
+  const { id } = req.params;
+
+  db.query('DELETE FROM medical_histories WHERE id = ?', [id], (err, results) => {
+    if (err) {
+      return errorResponse(res, 'Error deleting medical history.', err.message, 500);
+    } else if (results.affectedRows === 0) {
+      return errorResponse(res, 'Medical history not found.', null, 404);
+    }
+    successResponse(res, 'Medical history deleted successfully.', null, 204);
+  });
+});
+
+module.exports = router;
+
+
+/* ===== File: routes\patients.js ===== */
+const express = require('express');
+const bcrypt = require('bcrypt');
+const db = require('../db');
+const { verifyToken, verifyRole } = require('../middlewares/auth');
+
+const router = express.Router();
+
+// ✅ Get all patients
+router.get('/', verifyToken, async (req, res) => {
+  try {
+    const sql = `
+      SELECT id AS user_id, fullname, address, birthday, gender AS sex, email, contact_number, photo 
+      FROM users
+      WHERE role = 'patient'
+    `;
+
+    db.query(sql, (err, results) => {
+      if (err) {
+        console.error('Error fetching patients:', err);
+        return res.status(500).json({ message: "Internal server error.", data: null });
+      }
+      res.status(200).json({ message: "Patients retrieved successfully.", data: results });
+    });
+  } catch (error) {
+    console.error('Unexpected error:', error);
+    res.status(500).json({ message: "An unexpected error occurred.", data: null });
+  }
+});
+
+// ✅ Get a specific patient by ID
+router.get('/:id', verifyToken, async (req, res) => {
+  const { id } = req.params;
+
+  if (isNaN(id)) {
+    return res.status(400).json({ message: "Invalid patient ID.", data: null });
+  }
+
+  try {
+    const sql = `
+      SELECT 
+        id AS user_id, 
+        fullname, 
+        address, 
+        birthday, 
+        gender AS sex, 
+        email, 
+        contact_number, 
+        photo 
+      FROM users 
+      WHERE id = ? AND role = 'patient'
+    `;
+
+    db.query(sql, [id], (err, results) => {
+      if (err) {
+        console.error(`Error fetching patient ID ${id}:`, err);
+        return res.status(500).json({ message: "Internal server error.", data: null });
+      }
+      if (!results.length) return res.status(404).json({ message: "Patient not found.", data: null });
+
+      res.status(200).json({ message: "Patient retrieved successfully.", data: results[0] });
+    });
+  } catch (error) {
+    console.error(`Unexpected error fetching patient ID ${id}:`, error);
+    res.status(500).json({ message: "An unexpected error occurred.", data: null });
+  }
+});
+
+// ✅ Update patient details
+router.put('/:id', verifyToken, verifyRole('admin', 'patient'), async (req, res) => {
+  const { id } = req.params;
+  const { fullname, address, birthday, sex, contact_number, photo } = req.body;
+
+  if (isNaN(id)) {
+    return res.status(400).json({ message: "Invalid patient ID.", data: null });
+  }
+
+  try {
+    const sql = `
+      UPDATE users 
+      SET fullname = ?, address = ?, birthday = ?, gender = ?, contact_number = ?, photo = ?
+      WHERE id = ? AND role = 'patient'
+    `;
+
+    db.query(sql, [fullname, address, birthday, sex, contact_number, photo, id], (err, result) => {
+      if (err) {
+        console.error(`Error updating patient ID ${id}:`, err);
+        return res.status(500).json({ message: "Internal server error.", data: null });
+      }
+      if (result.affectedRows === 0) return res.status(404).json({ message: "Patient not found.", data: null });
+
+      res.status(200).json({ 
+        message: "Patient details updated successfully.", 
+        data: { id, fullname, address, birthday, sex, contact_number, photo } 
+      });
+    });
+  } catch (error) {
+    console.error(`Unexpected error updating patient ID ${id}:`, error);
+    res.status(500).json({ message: "An unexpected error occurred.", data: null });
+  }
+});
+
+// ✅ Reset a patient's password
+router.put('/reset-password/:id', verifyToken, verifyRole('admin', 'patient'), async (req, res) => {
+  const { id } = req.params;
+  const { newPassword } = req.body;
+
+  if (!newPassword) {
+    return res.status(400).json({ message: "Validation failed. Missing required fields.", data: null });
+  }
+
+  if (isNaN(id)) {
+    return res.status(400).json({ message: "Invalid patient ID.", data: null });
+  }
+
+  try {
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    const sql = `UPDATE users SET password = ? WHERE id = ? AND role = 'patient'`;
+
+    db.query(sql, [hashedPassword, id], (err, results) => {
+      if (err) {
+        console.error(`Error resetting password for patient ID ${id}:`, err);
+        return res.status(500).json({ message: "Error resetting password.", data: null });
+      }
+      if (results.affectedRows === 0) return res.status(404).json({ message: "Patient not found.", data: null });
+
+      res.status(200).json({ message: "Patient password reset successfully.", data: { id } });
+    });
+  } catch (error) {
+    console.error(`Error hashing password for patient ID ${id}:`, error);
+    res.status(500).json({ message: "An unexpected error occurred while resetting the password.", data: null });
+  }
+});
+
+module.exports = router;
+
+
+/* ===== File: routes\prescriptions.js ===== */
+const express = require('express');
+const db = require('../db'); // Database connection
+const { verifyToken, verifyRole } = require('../middlewares/auth'); // JWT middleware
+const { successResponse, errorResponse } = require('../utils/responseHelper'); // Response helpers
+
+const router = express.Router();
+
+/**
+ * ✅ Get all prescriptions
+ */
+router.get('/', verifyToken, (req, res) => {
+  db.query('SELECT * FROM prescriptions', (err, results) => {
+    if (err) return errorResponse(res, 'Error fetching prescriptions.', err.message, 500);
+    successResponse(res, 'Prescriptions retrieved successfully.', results);
+  });
+});
+
+/**
+ * ✅ Get a prescription by ID
+ */
+router.get('/:id', verifyToken, (req, res) => {
+  const { id } = req.params;
+
+  db.query('SELECT * FROM prescriptions WHERE id = ?', [id], (err, results) => {
+    if (err) return errorResponse(res, 'Error fetching prescription.', err.message, 500);
+    if (results.length === 0) return errorResponse(res, 'Prescription not found.', null, 404);
+    successResponse(res, 'Prescription retrieved successfully.', results[0]);
+  });
+});
+
+/**
+ * ✅ Get all prescriptions by Patient ID
+ */
+router.get('/patient/:patientId', verifyToken, (req, res) => {
+  const { patientId } = req.params;
+
+  db.query('SELECT * FROM prescriptions WHERE patient_id = ?', [patientId], (err, results) => {
+    if (err) return errorResponse(res, 'Error fetching prescriptions for the patient.', err.message, 500);
+    successResponse(res, 'Prescriptions retrieved successfully.', results);
+  });
+});
+
+/**
+ * ✅ Create a new prescription
+ */
+router.post('/', verifyToken, verifyRole('dentist', 'admin'), (req, res) => {
+  const { patient_id, dentist_id, medicine, notes } = req.body;
+
+  if (!patient_id || !dentist_id || !medicine) {
+    return errorResponse(res, 'Missing required fields.', null, 400);
+  }
+
+  const currentDate = new Date().toISOString().split('T')[0];
+
+  db.query(
+    'INSERT INTO prescriptions (patient_id, dentist_id, date, medicine, notes) VALUES (?, ?, ?, ?, ?)',
+    [patient_id, dentist_id, currentDate, medicine, notes],
+    (err, results) => {
+      if (err) return errorResponse(res, 'Error creating prescription.', err.message, 500);
+      successResponse(res, 'Prescription created successfully.', { id: results.insertId });
+    }
+  );
+});
+
+/**
+ * ✅ Update a prescription with validation
+ */
+router.put('/:id', verifyToken, verifyRole('dentist', 'admin'), (req, res) => {
+  const { id } = req.params;
+  const { patient_id, dentist_id, date, medicine, notes } = req.body;
+
+  if (!patient_id || !dentist_id || !date || !medicine) {
+    return errorResponse(res, 'Missing required fields.', null, 400);
+  }
+
+  db.query('SELECT * FROM prescriptions WHERE id = ?', [id], (err, results) => {
+    if (err) return errorResponse(res, 'Error checking prescription existence.', err.message, 500);
+    if (results.length === 0) return errorResponse(res, 'Prescription not found.', null, 404);
+
+    db.query(
+      'UPDATE prescriptions SET patient_id = ?, dentist_id = ?, date = ?, medicine = ?, notes = ? WHERE id = ?',
+      [patient_id, dentist_id, date, medicine, notes, id],
+      (err, updateResults) => {
+        if (err) return errorResponse(res, 'Error updating prescription.', err.message, 500);
+        successResponse(res, 'Prescription updated successfully.');
+      }
+    );
+  });
+});
+
+/**
+ * ✅ Delete a prescription with validation
+ */
+router.delete('/:id', verifyToken, verifyRole('dentist', 'admin'), (req, res) => {
+  const { id } = req.params;
+
+  db.query('SELECT * FROM prescriptions WHERE id = ?', [id], (err, results) => {
+    if (err) return errorResponse(res, 'Error checking prescription existence.', err.message, 500);
+    if (results.length === 0) return errorResponse(res, 'Prescription not found.', null, 404);
+
+    db.query('DELETE FROM prescriptions WHERE id = ?', [id], (err, deleteResults) => {
+      if (err) return errorResponse(res, 'Error deleting prescription.', err.message, 500);
+      successResponse(res, 'Prescription deleted successfully.');
+    });
+  });
+});
+
+module.exports = router;
+
+
+/* ===== File: routes\profile.js ===== */
+const express = require('express');
+const { verifyToken } = require('../middlewares/auth');
+const db = require('../db');
+
+const router = express.Router();
+
+// Get Profile
+router.get('/', verifyToken, (req, res) => {
+  db.query('SELECT id, email, fullname, role FROM users WHERE id = ?', [req.user.id], (err, results) => {
+    if (err) return res.status(500).json({ error: err.message });
+    if (results.length === 0) return res.status(404).json({ message: 'User not found.' });
+
+    res.json(results[0]);
+  });
+});
+
+module.exports = router;
+
+
+/* ===== File: routes\schedules.js ===== */
+const express = require('express');
+const db = require('../db');
+const { verifyToken, verifyRole } = require('../middlewares/auth');
+const { successResponse, errorResponse } = require('../utils/responseHelper');
+
+const router = express.Router();
+
+/**
+ * Get all schedules (Token required, no role restrictions)
+ */
+router.get('/', verifyToken, (req, res) => {
+  const sql = `SELECT id, dentist_id, date, start_time, end_time, created_at, updated_at FROM schedules`;
+
+  db.query(sql, (err, results) => {
+    if (err) {
+      return errorResponse(res, 'Error fetching schedules.', null, err.message, 500);
+    }
+    successResponse(res, 'Schedules retrieved successfully.', results, null);
+  });
+});
+
+/**
+ * Get a specific schedule by ID (Token required, no role restrictions)
+ */
+router.get('/:id', verifyToken, (req, res) => {
+  const { id } = req.params;
+
+  if (isNaN(id)) {
+    return errorResponse(res, 'Invalid schedule ID.', null, 'Validation Error', 400);
+  }
+
+  const sql = `SELECT * FROM schedules WHERE id = ?`;
+
+  db.query(sql, [id], (err, results) => {
+    if (err) {
+      return errorResponse(res, 'Error fetching schedule.', null, err.message, 500);
+    }
+    if (results.length === 0) {
+      return errorResponse(res, 'Schedule not found.', null, null, 404);
+    }
+    successResponse(res, 'Schedule retrieved successfully.', results[0], null);
+  });
+});
+
+/**
+ * Create a new schedule with transactional timeslot generation
+ */
+router.post('/', verifyToken, verifyRole('dentist', 'admin'), (req, res) => {
+  const { dentist_id, date, start_time, end_time } = req.body;
+
+  // ✅ Validate required fields
+  if (!dentist_id || !date || !start_time || !end_time) {
+    return errorResponse(res, 'Missing required fields.', null, 400);
+  }
+
+  db.beginTransaction((err) => {
+    if (err) {
+      return errorResponse(res, 'Failed to start transaction.', err.message, 500);
+    }
+
+    // ✅ Step 1: Check if the dentist exists
+    db.query(`SELECT id FROM dentists WHERE id = ?`, [dentist_id], (err, dentistCheck) => {
+      if (err) {
+        db.rollback(() => {});
+        return errorResponse(res, 'Error checking dentist.', err.message, 500);
+      }
+
+      if (dentistCheck.length === 0) {
+        db.rollback(() => {});
+        return errorResponse(res, 'Invalid dentist ID.', null, 400);
+      }
+
+      // ✅ Step 2: Insert Schedule
+      db.query(
+        `INSERT INTO schedules (dentist_id, date, start_time, end_time) VALUES (?, ?, ?, ?)`,
+        [dentist_id, date, start_time, end_time],
+        (err, scheduleResult) => {
+          if (err) {
+            db.rollback(() => {});
+            return errorResponse(res, 'Error inserting schedule.', err.message, 500);
+          }
+
+          const schedule_id = scheduleResult.insertId;
+
+          // ✅ Step 3: Generate Timeslots with Proper Time Format
+          let currentTime = start_time;
+          const timeslots = [];
+          const intervalMinutes = 60;
+          const breakStartTime = '12:00:00';
+          const breakEndTime = '13:00:00';
+
+          while (currentTime < end_time) {
+            if (currentTime >= breakStartTime && currentTime < breakEndTime) {
+              currentTime = breakEndTime;
+            } else {
+              let nextTime = new Date(`1970-01-01T${currentTime}Z`);
+              nextTime.setMinutes(nextTime.getMinutes() + intervalMinutes);
+
+              let formattedEndTime = nextTime.toISOString().substr(11, 8); // ✅ Converts to "HH:MM:SS"
+
+              timeslots.push([schedule_id, currentTime, formattedEndTime]);
+
+              currentTime = formattedEndTime; // ✅ Use properly formatted time for next iteration
+            }
+          }
+
+          if (timeslots.length > 0) {
+            db.query(
+              `INSERT INTO timeslots (schedule_id, start_time, end_time) VALUES ?`,
+              [timeslots],
+              (err) => {
+                if (err) {
+                  db.rollback(() => {});
+                  return errorResponse(res, 'Error inserting timeslots.', err.message, 500);
+                }
+
+                // ✅ Step 4: Commit transaction
+                db.commit((err) => {
+                  if (err) {
+                    db.rollback(() => {});
+                    return errorResponse(res, 'Error committing transaction.', err.message, 500);
+                  }
+
+                  successResponse(res, 'Schedule and timeslots created successfully.', {
+                    schedule_id,
+                    dentist_id,
+                    date,
+                    start_time,
+                    end_time,
+                  });
+                });
+              }
+            );
+          } else {
+            db.rollback(() => {});
+            return errorResponse(res, 'No valid timeslots generated.', null, 400);
+          }
+        }
+      );
+    });
+  });
+});
+
+/**
+ * Delete a schedule (Token and Dentist role required)
+ */
+router.delete('/:id', verifyToken, verifyRole('dentist', 'admin'), (req, res) => {
+  const { id } = req.params;
+
+  if (isNaN(id)) {
+    return errorResponse(res, 'Invalid schedule ID.', null, 'Validation Error', 400);
+  }
+
+  const sql = `DELETE FROM schedules WHERE id = ?`;
+
+  db.query(sql, [id], (err, results) => {
+    if (err) {
+      return errorResponse(res, 'Error deleting schedule.', null, err.message, 500);
+    }
+    if (results.affectedRows === 0) {
+      return errorResponse(res, 'Schedule not found.', null, null, 404);
+    }
+    successResponse(res, 'Schedule and associated timeslots deleted successfully.', { deleted_schedule_id: id }, null);
+  });
+});
+
+/**
+ * Get schedules by dentist ID (Token required, no role restrictions)
+ */
+router.get('/dentist/:dentistId', verifyToken, (req, res) => {
+  const { dentistId } = req.params;
+
+  if (isNaN(dentistId)) {
+    return errorResponse(res, 'Invalid dentist ID.', null, 'Validation Error', 400);
+  }
+
+  const sql = `
+    SELECT schedules.id, schedules.date, schedules.start_time, schedules.end_time, schedules.created_at, schedules.updated_at
+    FROM schedules
+    WHERE schedules.dentist_id = ?;
+  `;
+
+  db.query(sql, [dentistId], (err, results) => {
+    if (err) {
+      return errorResponse(res, 'Error fetching schedules for dentist.', null, err.message, 500);
+    }
+    successResponse(res, 'Schedules retrieved successfully.', results, null);
+  });
+});
+
+router.get('/confirmed/:schedule_id', verifyToken, (req, res) => {
+  const { schedule_id } = req.params;
+
+  if (isNaN(schedule_id)) {
+      return errorResponse(res, 'Invalid schedule ID.', null, 'Validation Error', 400);
+  }
+
+  const sql = `
+      SELECT timeslots.id, timeslots.schedule_id, timeslots.start_time, timeslots.end_time, appointments.status 
+      FROM timeslots 
+      JOIN appointments ON timeslots.id = appointments.timeslot_id
+      WHERE timeslots.schedule_id = ? AND appointments.status = 'confirmed';
+  `;
+
+  db.query(sql, [schedule_id], (err, results) => {
+      if (err) {
+          return errorResponse(res, 'Error fetching confirmed timeslots.', null, err.message, 500);
+      }
+      successResponse(res, 'Confirmed timeslots retrieved successfully.', results, null);
+  });
+});
+
+module.exports = router;
+
+
+/* ===== File: routes\serviceslist.js ===== */
+const express = require('express');
+const db = require('../db');
+const { verifyToken, verifyRole } = require('../middlewares/auth');
+const router = express.Router();
+
+/**
+ * Get all services
+ */
+router.get('/', verifyToken, (req, res) => {
+  db.query('SELECT * FROM serviceslist', (err, results) => {
+    if (err) {
+      return res.status(500).json({
+        message: 'Error fetching services.',
+        error: err.message,
+      });
+    }
+    res.status(200).json({
+      message: results.length ? 'Services retrieved successfully.' : 'No services found.',
+      data: results,
+    });
+  });
+});
+
+/**
+ * Get a specific service by ID
+ */
+router.get('/:id', verifyToken, (req, res) => {
+  const { id } = req.params; // ✅ Correct: Extract "id" from req.params
+  db.query('SELECT * FROM serviceslist WHERE id = ?', [id], (err, results) => {
+    if (err) {
+      return res.status(500).json({
+        message: 'Error fetching service.',
+        error: err.message,
+      });
+    }
+    if (results.length === 0) {
+      return res.status(404).json({
+        message: 'Service not found.',
+      });
+    }
+    res.status(200).json({
+      message: 'Service retrieved successfully.',
+      data: results[0],
+    });
+  });
+});
+
+/**
+ * Create a new service
+ */
+router.post('/', verifyToken, verifyRole('admin'), (req, res) => {
+  const { service_name, title, content, photo } = req.body;
+
+  const sql = 'INSERT INTO serviceslist (service_name, title, content, photo) VALUES (?, ?, ?, ?)';
+  db.query(sql, [service_name, title, content, photo], (err, results) => {
+    if (err) {
+      return res.status(500).json({
+        message: 'Error creating service.',
+        error: err.message,
+      });
+    }
+    res.status(201).json({
+      message: 'Service created successfully.',
+      data: {
+        id: results.insertId,
+        service_name,
+        title,
+        content,
+        photo,
+      },
+    });
+  });
+});
+
+/**
+ * Update a service
+ */
+router.put('/:id', verifyToken, verifyRole('admin'), (req, res) => {
+  const { id } = req.params;
+  const { service_name, title, content, photo } = req.body;
+
+  const sql = 'UPDATE serviceslist SET service_name = ?, title = ?, content = ?, photo = ? WHERE id = ?';
+  db.query(sql, [service_name, title, content, photo, id], (err, results) => {
+    if (err) {
+      return res.status(500).json({
+        message: 'Error updating service.',
+        error: err.message,
+      });
+    }
+    if (results.affectedRows === 0) {
+      return res.status(404).json({
+        message: 'Service not found.',
+      });
+    }
+    res.status(200).json({
+      message: 'Service updated successfully.',
+    });
+  });
+});
+
+/**
+ * Delete a service
+ */
+router.delete('/:id', verifyToken, verifyRole('admin'), (req, res) => {
+  const { id } = req.params;
+
+  db.query('DELETE FROM serviceslist WHERE id = ?', [id], (err, results) => {
+    if (err) {
+      return res.status(500).json({
+        message: 'Error deleting service.',
+        error: err.message,
+      });
+    }
+    if (results.affectedRows === 0) {
+      return res.status(404).json({
+        message: 'Service not found.',
+      });
+    }
+    res.status(200).json({
+      message: 'Service deleted successfully.',
+    });
+  });
+});
+
+module.exports = router;
+
+
+/* ===== File: routes\staff.js ===== */
+const express = require('express');
+const bcrypt = require('bcrypt');
+const db = require('../db');
+const { verifyToken, verifyRole } = require('../middlewares/auth');
+const { successResponse, errorResponse } = require('../utils/responseHelper'); // Envelope response helpers
+
+const router = express.Router();
+
+/**
+ * Create a new staff member (Admin only)
+ */
+router.post('/register', verifyToken, verifyRole('admin'), async (req, res) => {
+  const {
+    email,
+    password,
+    fullname,
+    photo,
+    birthday,
+    address,
+    gender,
+    contact_number,
+    role = 'staff', // Default role is staff
+  } = req.body;
+
+  try {
+    // Validate required fields
+    if (!email || !password || !fullname) {
+      return errorResponse(res, 'Validation failed. Missing required fields.', null, 400);
+    }
+
+    // Hash the password
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    // Insert the new staff member into the database
+    const sql = `
+      INSERT INTO users (email, password, role, status, fullname, photo, birthday, address, gender, contact_number, email_verified)
+      VALUES (?, ?, ?, 'active', ?, ?, ?, ?, ?, ?, 1)
+    `;
+
+    db.query(
+      sql,
+      [email, hashedPassword, role, fullname, photo, birthday, address, gender, contact_number],
+      (err, results) => {
+        if (err) {
+          return errorResponse(res, 'Registration failed.', err.message, 500);
+        }
+
+        // Send a success response
+        successResponse(res, 'Staff registered successfully.', {
+          email,
+          role,
+          status: 'active',
+          fullname,
+          photo,
+          birthday,
+          address,
+          gender,
+          contact_number,
+          email_verified: true,
+        });
+      }
+    );
+  } catch (error) {
+    errorResponse(res, 'An error occurred during registration.', error.message, 500);
+  }
+});
+
+/**
+ * Get all staff members (Admin only)
+ */
+router.get('/', verifyToken, verifyRole('admin'), (req, res) => {
+  const sql = `
+    SELECT 
+      id, email, fullname, photo, birthday, address, gender, contact_number, role, status, email_verified
+    FROM 
+      users
+    WHERE 
+      role = 'staff'
+  `;
+
+  db.query(sql, (err, results) => {
+    if (err) {
+      return errorResponse(res, 'Error fetching staff members.', err.message, 500);
+    }
+
+    if (results.length === 0) {
+      return errorResponse(res, 'No staff members found.', null, 404);
+    }
+
+    successResponse(res, 'Staff members retrieved successfully.', results);
+  });
+});
+
+/**
+ * Get a specific staff member by ID
+ */
+router.get('/:id', verifyToken, (req, res) => {
+  const { id } = req.params;
+
+  const sql = `
+    SELECT 
+      id, email, fullname, photo, birthday, address, gender, contact_number, role, status, email_verified
+    FROM 
+      users
+    WHERE 
+      id = ? AND role = 'staff'
+  `;
+
+  db.query(sql, [id], (err, results) => {
+    if (err) {
+      return errorResponse(res, 'Error fetching staff member by ID.', err.message, 500);
+    }
+    if (results.length === 0) {
+      return errorResponse(res, 'Staff member not found.', null, 404);
+    }
+
+    successResponse(res, 'Staff member retrieved successfully.', results[0]);
+  });
+});
+
+/**
+ * Update a specific staff member (Admin only)
+ */
+router.put('/:id', verifyToken, verifyRole('admin'), (req, res) => {
+  const { id: pathId } = req.params;
+  const {
+    id: bodyId,
+    fullname,
+    photo,
+    birthday,
+    address,
+    gender,
+    contact_number,
+  } = req.body;
+
+  // Ensure the ID in the body matches the ID in the path
+  if (parseInt(pathId) !== parseInt(bodyId)) {
+    return errorResponse(res, 'Path ID and body ID do not match.', null, 400);
+  }
+
+  const sql = `
+    UPDATE users 
+    SET fullname = ?, photo = ?, birthday = ?, address = ?, gender = ?, contact_number = ?
+    WHERE id = ? AND role = 'staff'
+  `;
+
+  db.query(
+    sql,
+    [fullname, photo, birthday, address, gender, contact_number, pathId],
+    (err, results) => {
+      if (err) {
+        return errorResponse(res, 'Error updating staff details.', err.message, 500);
+      }
+      if (results.affectedRows === 0) {
+        return errorResponse(res, 'Staff member not found.', null, 404);
+      }
+
+      successResponse(res, 'Staff member details updated successfully.', null);
+    }
+  );
+});
+
+/**
+ * Delete a specific staff member (Admin only)
+ */
+router.delete('/:id', verifyToken, verifyRole('admin'), (req, res) => {
+  const { id } = req.params;
+
+  const sql = `DELETE FROM users WHERE id = ? AND role = 'staff'`;
+
+  db.query(sql, [id], (err, results) => {
+    if (err) {
+      return errorResponse(res, 'Error deleting staff member.', err.message, 500);
+    }
+    if (results.affectedRows === 0) {
+      return errorResponse(res, 'Staff member not found.', null, 404);
+    }
+
+    successResponse(res, 'Staff member deleted successfully.', null);
+  });
+});
+
+/**
+ * Reset a staff member's password (Staff only)
+ */
+router.put('/reset-password/:id', verifyToken, verifyRole('staff','super_admin','admin'), async (req, res) => {
+    const { id } = req.params;
+    const { newPassword } = req.body;
+  
+    // Validate input
+    if (!newPassword) {
+      return errorResponse(res, 'Validation failed. Missing required fields.', null, 400);
+    }
+  
+    try {
+      // Hash the new password
+      const hashedPassword = await bcrypt.hash(newPassword, 10);
+  
+      // Update the staff member's password in the database
+      const sql = `
+        UPDATE users
+        SET password = ?
+        WHERE id = ? AND role = 'staff'
+      `;
+  
+      db.query(sql, [hashedPassword, id], (err, results) => {
+        if (err) {
+          return errorResponse(res, 'Error resetting password.', err.message, 500);
+        }
+  
+        if (results.affectedRows === 0) {
+          return errorResponse(res, 'Staff member not found.', null, 404);
+        }
+  
+        successResponse(res, 'Staff password reset successfully.', null);
+      });
+    } catch (error) {
+      errorResponse(res, 'An error occurred while resetting the password.', error.message, 500);
+    }
+  });
+
+module.exports = router;
+
+
+/* ===== File: routes\timeslots.js ===== */
+const express = require('express');
+const db = require('../db');
+const { verifyToken } = require('../middlewares/auth');
+const { successResponse, errorResponse } = require('../utils/responseHelper');
+
+const router = express.Router();
+
+/**
+ * Get all timeslots
+ */
+router.get('/all', verifyToken, (req, res) => {
+  const sql = `
+    SELECT id, schedule_id, start_time, end_time, created_at, updated_at
+    FROM timeslots;
+  `;
+
+  db.query(sql, (err, results) => {
+    if (err) {
+      return errorResponse(res, 'Error fetching all timeslots.', err.message, 500);
+    }
+
+    successResponse(res, results.length ? 'All timeslots retrieved successfully.' : 'No timeslots found.', results);
+  });
+});
+
+/**
+ * Get available timeslots by schedule ID
+ */
+router.get('/available/:schedule_id', verifyToken, (req, res) => {
+  const { schedule_id } = req.params;
+
+  const sql = `
+    SELECT t.id, t.schedule_id, t.start_time, t.end_time, t.created_at, t.updated_at
+    FROM timeslots t
+    LEFT JOIN appointments a ON t.id = a.timeslot_id AND a.status != 'canceled'  -- Exclude canceled appointments
+    WHERE a.timeslot_id IS NULL AND t.schedule_id = ?;
+  `;
+
+  db.query(sql, [schedule_id], (err, results) => {
+    if (err) {
+      return errorResponse(res, 'Error fetching available timeslots.', err.message, 500);
+    }
+
+    successResponse(res, results.length ? 'Available timeslots retrieved successfully.' : 'No available timeslots found.', results);
+  });
+});
+
+
+/**
+ * Get all timeslots by schedule ID (Includes booked & available)
+ */
+router.get('/all/:schedule_id', verifyToken, (req, res) => {
+  const { schedule_id } = req.params;
+
+  const sql = `
+    SELECT id, schedule_id, start_time, end_time, created_at, updated_at
+    FROM timeslots
+    WHERE schedule_id = ?;
+  `;
+
+  db.query(sql, [schedule_id], (err, results) => {
+    if (err) {
+      return errorResponse(res, 'Error fetching timeslots by schedule ID.', err.message, 500);
+    }
+
+    successResponse(res, results.length ? 'All timeslots retrieved successfully for the given schedule ID.' : 'No timeslots found for the given schedule ID.', results);
+  });
+});
+
+/**
+ * Get a single timeslot by ID
+ */
+router.get('/:id', verifyToken, (req, res) => {
+  const { id } = req.params;
+
+  const sql = `
+    SELECT id, schedule_id, start_time, end_time, created_at, updated_at
+    FROM timeslots
+    WHERE id = ?;
+  `;
+
+  db.query(sql, [id], (err, results) => {
+    if (err) {
+      return errorResponse(res, 'Error fetching the timeslot.', err.message, 500);
+    }
+
+    if (results.length === 0) {
+      return errorResponse(res, 'Timeslot not found.', 'No timeslot found with the given ID.', 404);
+    }
+
+    successResponse(res, 'Timeslot retrieved successfully.', results[0]);
+  });
+});
+
+
+module.exports = router;
+
+
+/* ===== File: routes\treatments.js ===== */
+const express = require('express');
+const router = express.Router();
+const db = require('../db'); // Import your database connection
+const { verifyToken, verifyRole } = require('../middlewares/auth');
+
+// Get all treatments
+router.get('/treatments', (req, res) => {
+  db.query('SELECT * FROM treatments', (err, results) => {
+    if (err) {
+      res.status(500).send(err);
+    } else {
+      res.json(results);
+    }
+  });
+});
+
+// Add a new treatment
+router.post('/treatments', verifyToken, verifyRole('admin'), (req, res) => {
+  const { patientId, dateVisit, teethNos, treatment, description, fees, remarks } = req.body;
+  const sql = 'INSERT INTO treatments (patientId, dateVisit, teethNos, treatment, description, fees, remarks) VALUES (?, ?, ?, ?, ?, ?, ?)';
+  db.query(sql, [patientId, dateVisit, teethNos, treatment, description, fees, remarks], (err, result) => {
+    if (err) {
+      res.status(500).send(err);
+    } else {
+      res.json({ id: result.insertId, patientId, dateVisit, teethNos, treatment, description, fees, remarks });
+    }
+  });
+});
+
+// Update a treatment
+router.put('/treatments/:id', verifyToken, verifyRole('admin'), (req, res) => {
+  const { id } = req.params;
+  const { patientId, dateVisit, teethNos, treatment, description, fees, remarks } = req.body;
+  const sql = 'UPDATE treatments SET patientId = ?, dateVisit = ?, teethNos = ?, treatment = ?, description = ?, fees = ?, remarks = ? WHERE id = ?';
+  db.query(sql, [patientId, dateVisit, teethNos, treatment, description, fees, remarks, id], (err) => {
+    if (err) {
+      res.status(500).send(err);
+    } else {
+      res.json({ message: 'Treatment updated successfully.' });
+    }
+  });
+});
+
+// Delete a treatment
+router.delete('/treatments/:id', verifyToken, verifyRole('admin'), (req, res) => {
+  const { id } = req.params;
+  db.query('DELETE FROM treatments WHERE id = ?', [id], (err) => {
+    if (err) {
+      res.status(500).send(err);
+    } else {
+      res.json({ message: 'Treatment deleted successfully.' });
+    }
+  });
+});
+
+module.exports = router; // Export the Router
+
+/* ===== File: middlewares\auth.js ===== */
+const jwt = require('jsonwebtoken');
+
+// Generate an Access Token
+const generateAccessToken = (user) => {
+  return jwt.sign(
+    { id: user.id, role: user.role },
+    process.env.ACCESS_TOKEN_SECRET,
+    { expiresIn: '15m' }
+  );
+};
+
+// Generate a Refresh Token
+const generateRefreshToken = (user) => {
+  return jwt.sign(
+    { id: user.id, role: user.role },
+    process.env.REFRESH_TOKEN_SECRET,
+    { expiresIn: '7d' }
+  );
+};
+
+// Verify JWT Token Middleware
+const verifyToken = (req, res, next) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ message: 'Token is missing or invalid' });
+  }
+
+  const token = authHeader.split(' ')[1];
+  jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decoded) => {
+    if (err) return res.status(403).json({ message: 'Invalid or expired token' });
+
+    req.user = decoded; // Add user info to the request object
+    next();
+  });
+};
+
+// Middleware to Verify Roles
+const verifyRole = (...allowedRoles) => (req, res, next) => {
+  if (!allowedRoles.includes(req.user.role)) {
+    return res.status(403).json({ message: 'Access forbidden: Insufficient role privileges' });
+  }
+  next();
+};
+
+
+
+module.exports = { generateAccessToken, generateRefreshToken, verifyToken, verifyRole };
+
+
+/* ===== File: utils\email.js ===== */
+const nodemailer = require('nodemailer');
+
+const sendEmail = async (to, subject, html) => {
+  const transporter = nodemailer.createTransport({
+    host: 'smtp.ethereal.email',
+    port: 587,
+    secure: false, // Use TLS
+    auth: {
+      user: process.env.EMAIL_USER,
+      pass: process.env.EMAIL_PASS,
+    },
+  });
+
+  const mailOptions = {
+    from: `"Dental App" <${process.env.EMAIL_USER}>`,
+    to,
+    subject,
+    html,
+  };
+
+  const info = await transporter.sendMail(mailOptions);
+  console.log('Email sent:', info.response);
+  console.log('Preview URL:', nodemailer.getTestMessageUrl(info)); // Add preview URL for testing
+  return info; // Return info for further use if needed
+};
+
+module.exports = sendEmail;
+
+
+/* ===== File: utils\responseHelper.js ===== */
+const successResponse = (res, message, data = null, statusCode = 200) => {
+  // ✅ Ensure statusCode is always a valid number between 100-599
+  const validStatus = Number.isInteger(statusCode) && statusCode >= 100 && statusCode <= 599 ? statusCode : 200;
+  
+  res.status(validStatus).json({
+    message,
+    data,
+  });
+};
+
+const errorResponse = (res, message, error = null, statusCode = 400) => {
+  // ✅ Ensure statusCode is always a valid number between 100-599
+  const validStatus = Number.isInteger(statusCode) && statusCode >= 100 && statusCode <= 599 ? statusCode : 400;
+
+  res.status(validStatus).json({
+    message,
+    error,
+  });
+};
+  
+  module.exports = { successResponse, errorResponse };
+  

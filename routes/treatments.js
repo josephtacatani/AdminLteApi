@@ -1,56 +1,95 @@
 const express = require('express');
 const router = express.Router();
-const db = require('../db'); // Import your database connection
+const db = require('../db'); // Database connection
 const { verifyToken, verifyRole } = require('../middlewares/auth');
+const { successResponse, errorResponse } = require('../utils/responseHelper'); // Response helpers
 
-// Get all treatments
-router.get('/treatments', (req, res) => {
+// ✅ Get all treatments with validation
+router.get('/', verifyToken, (req, res) => {
   db.query('SELECT * FROM treatments', (err, results) => {
-    if (err) {
-      res.status(500).send(err);
-    } else {
-      res.json(results);
-    }
+    if (err) return errorResponse(res, 'Error fetching treatments.', err.message, 500);
+    if (results.length === 0) return errorResponse(res, 'No treatments found.', null, 404);
+    successResponse(res, 'Treatments retrieved successfully.', results);
   });
 });
 
-// Add a new treatment
-router.post('/treatments', verifyToken, verifyRole('admin'), (req, res) => {
-  const { patientId, dateVisit, teethNos, treatment, description, fees, remarks } = req.body;
-  const sql = 'INSERT INTO treatments (patientId, dateVisit, teethNos, treatment, description, fees, remarks) VALUES (?, ?, ?, ?, ?, ?, ?)';
-  db.query(sql, [patientId, dateVisit, teethNos, treatment, description, fees, remarks], (err, result) => {
-    if (err) {
-      res.status(500).send(err);
-    } else {
-      res.json({ id: result.insertId, patientId, dateVisit, teethNos, treatment, description, fees, remarks });
-    }
-  });
-});
-
-// Update a treatment
-router.put('/treatments/:id', verifyToken, verifyRole('admin'), (req, res) => {
+// ✅ Get a treatment by ID with validation
+router.get('/:id', verifyToken, (req, res) => {
   const { id } = req.params;
-  const { patientId, dateVisit, teethNos, treatment, description, fees, remarks } = req.body;
-  const sql = 'UPDATE treatments SET patientId = ?, dateVisit = ?, teethNos = ?, treatment = ?, description = ?, fees = ?, remarks = ? WHERE id = ?';
-  db.query(sql, [patientId, dateVisit, teethNos, treatment, description, fees, remarks, id], (err) => {
-    if (err) {
-      res.status(500).send(err);
-    } else {
-      res.json({ message: 'Treatment updated successfully.' });
-    }
+
+  db.query('SELECT * FROM treatments WHERE id = ?', [id], (err, results) => {
+    if (err) return errorResponse(res, 'Error fetching treatment by ID.', err.message, 500);
+    if (results.length === 0) return errorResponse(res, 'Treatment not found.', null, 404);
+    successResponse(res, 'Treatment retrieved successfully.', results[0]);
   });
 });
 
-// Delete a treatment
-router.delete('/treatments/:id', verifyToken, verifyRole('admin'), (req, res) => {
+// ✅ Get treatments by patient ID with validation
+router.get('/patient/:patientId', verifyToken, (req, res) => {
+  const { patientId } = req.params;
+
+  db.query('SELECT * FROM treatments WHERE patient_id = ?', [patientId], (err, results) => {
+    if (err) return errorResponse(res, 'Error fetching treatments for patient.', err.message, 500);
+    if (results.length === 0) return errorResponse(res, 'No treatments found for this patient.', null, 404);
+    successResponse(res, 'Treatments retrieved successfully.', results);
+  });
+});
+
+// ✅ Create a new treatment with validation
+router.post('/', verifyToken, verifyRole('admin', 'dentist'), (req, res) => {
+  const { patient_id, dentist_id, date_visit, teeth, treatment, description, fees, remarks } = req.body;
+
+  if (!patient_id || !dentist_id || !date_visit || !treatment) {
+    return errorResponse(res, 'Missing required fields.', null, 400);
+  }
+
+  db.query(
+    'INSERT INTO treatments (patient_id, dentist_id, date_visit, teeth, treatment, description, fees, remarks) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+    [patient_id, dentist_id, date_visit, teeth, treatment, description, fees, remarks],
+    (err, results) => {
+      if (err) return errorResponse(res, 'Error adding treatment.', err.message, 500);
+      successResponse(res, 'Treatment added successfully.', { id: results.insertId });
+    }
+  );
+});
+
+// ✅ Update a treatment with validation
+router.put('/:id', verifyToken, verifyRole('admin', 'dentist'), (req, res) => {
   const { id } = req.params;
-  db.query('DELETE FROM treatments WHERE id = ?', [id], (err) => {
-    if (err) {
-      res.status(500).send(err);
-    } else {
-      res.json({ message: 'Treatment deleted successfully.' });
-    }
+  const { patient_id, dentist_id, date_visit, teeth, treatment, description, fees, remarks } = req.body;
+
+  if (!patient_id || !dentist_id || !date_visit || !treatment) {
+    return errorResponse(res, 'Missing required fields.', null, 400);
+  }
+
+  db.query('SELECT * FROM treatments WHERE id = ?', [id], (err, results) => {
+    if (err) return errorResponse(res, 'Error checking treatment existence.', err.message, 500);
+    if (results.length === 0) return errorResponse(res, 'Treatment not found.', null, 404);
+
+    db.query(
+      'UPDATE treatments SET patient_id = ?, dentist_id = ?, date_visit = ?, teeth = ?, treatment = ?, description = ?, fees = ?, remarks = ? WHERE id = ?',
+      [patient_id, dentist_id, date_visit, teeth, treatment, description, fees, remarks, id],
+      (err) => {
+        if (err) return errorResponse(res, 'Error updating treatment.', err.message, 500);
+        successResponse(res, 'Treatment updated successfully.');
+      }
+    );
   });
 });
 
-module.exports = router; // Export the Router
+// ✅ Delete a treatment with validation
+router.delete('/:id', verifyToken, verifyRole('admin', 'dentist'), (req, res) => {
+  const { id } = req.params;
+
+  db.query('SELECT * FROM treatments WHERE id = ?', [id], (err, results) => {
+    if (err) return errorResponse(res, 'Error checking treatment existence.', err.message, 500);
+    if (results.length === 0) return errorResponse(res, 'Treatment not found.', null, 404);
+
+    db.query('DELETE FROM treatments WHERE id = ?', [id], (err) => {
+      if (err) return errorResponse(res, 'Error deleting treatment.', err.message, 500);
+      successResponse(res, 'Treatment deleted successfully.');
+    });
+  });
+});
+
+module.exports = router;
