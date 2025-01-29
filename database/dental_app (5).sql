@@ -110,15 +110,7 @@ INSERT INTO `appointments` (`id`, `patient_id`, `dentist_id`, `health_declaratio
 --
 -- Triggers `appointments`
 --
-DELIMITER $$
-CREATE TRIGGER `after_appointment_insert` AFTER INSERT ON `appointments` FOR EACH ROW BEGIN
-    -- Example: Automatically set status to 'pending' for new appointments
-    IF NEW.status IS NULL THEN
-        UPDATE appointments SET status = 'pending' WHERE id = NEW.id;
-    END IF;
-END
-$$
-DELIMITER ;
+
 
 -- --------------------------------------------------------
 

@@ -210,4 +210,107 @@ router.get('/confirmed/:schedule_id', verifyToken, (req, res) => {
   });
 });
 
+router.put('/:id', verifyToken, verifyRole('dentist', 'admin'), (req, res) => {
+  const { id } = req.params;
+  const { dentist_id, date, start_time, end_time } = req.body;
+
+  if (!dentist_id || !date || !start_time || !end_time) {
+    return errorResponse(res, 'Missing required fields.', null, 400);
+  }
+
+  if (isNaN(id)) {
+    return errorResponse(res, 'Invalid schedule ID.', null, 'Validation Error', 400);
+  }
+
+  db.beginTransaction((err) => {
+    if (err) {
+      return errorResponse(res, 'Failed to start transaction.', err.message, 500);
+    }
+
+    db.query(`SELECT * FROM schedules WHERE id = ?`, [id], (err, existingSchedule) => {
+      if (err) {
+        db.rollback(() => {});
+        return errorResponse(res, 'Error checking schedule.', err.message, 500);
+      }
+
+      if (existingSchedule.length === 0) {
+        db.rollback(() => {});
+        return errorResponse(res, 'Schedule not found.', null, 404);
+      }
+
+      const oldSchedule = existingSchedule[0];
+
+      db.query(
+        `UPDATE schedules SET dentist_id = ?, date = ?, start_time = ?, end_time = ? WHERE id = ?`,
+        [dentist_id, date, start_time, end_time, id],
+        (err) => {
+          if (err) {
+            db.rollback(() => {});
+            return errorResponse(res, 'Error updating schedule.', err.message, 500);
+          }
+
+          // ✅ Step 1: Delete old timeslots before inserting new ones
+          db.query(`DELETE FROM timeslots WHERE schedule_id = ?`, [id], (err) => {
+            if (err) {
+              db.rollback(() => {});
+              return errorResponse(res, 'Error deleting old timeslots.', err.message, 500);
+            }
+
+            // ✅ Step 2: Generate new timeslots
+            let currentTime = start_time;
+            const timeslots = [];
+            const intervalMinutes = 60;
+            const breakStartTime = '12:00:00';
+            const breakEndTime = '13:00:00';
+
+            while (currentTime < end_time) {
+              if (currentTime >= breakStartTime && currentTime < breakEndTime) {
+                currentTime = breakEndTime;
+              } else {
+                let nextTime = new Date(`1970-01-01T${currentTime}Z`);
+                nextTime.setMinutes(nextTime.getMinutes() + intervalMinutes);
+                let formattedEndTime = nextTime.toISOString().substr(11, 8);
+
+                timeslots.push([id, currentTime, formattedEndTime]);
+                currentTime = formattedEndTime;
+              }
+            }
+
+            if (timeslots.length > 0) {
+              db.query(
+                `INSERT INTO timeslots (schedule_id, start_time, end_time) VALUES ?`,
+                [timeslots],
+                (err) => {
+                  if (err) {
+                    db.rollback(() => {});
+                    return errorResponse(res, 'Error inserting new timeslots.', err.message, 500);
+                  }
+
+                  db.commit((err) => {
+                    if (err) {
+                      db.rollback(() => {});
+                      return errorResponse(res, 'Error committing transaction.', err.message, 500);
+                    }
+
+                    successResponse(res, 'Schedule updated successfully with new timeslots.', {
+                      id,
+                      dentist_id,
+                      date,
+                      start_time,
+                      end_time,
+                    });
+                  });
+                }
+              );
+            } else {
+              db.rollback(() => {});
+              return errorResponse(res, 'No valid timeslots generated.', null, 400);
+            }
+          });
+        }
+      );
+    });
+  });
+});
+
 module.exports = router;

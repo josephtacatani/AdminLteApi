@@ -253,3 +253,81 @@
  *       404:
  *         description: No schedules found for the dentist.
  */
+
+/**
+ * @swagger
+ * /schedules/{id}:
+ *   put:
+ *     summary: Update a schedule
+ *     description: Updates an existing schedule. If the date is changed, existing timeslots will be deleted and new ones generated.
+ *     tags: [Schedules]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: The ID of the schedule to update.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               dentist_id:
+ *                 type: integer
+ *                 example: 1
+ *               date:
+ *                 type: string
+ *                 format: date
+ *                 example: "2025-02-01"
+ *               start_time:
+ *                 type: string
+ *                 format: time
+ *                 example: "09:00:00"
+ *               end_time:
+ *                 type: string
+ *                 format: time
+ *                 example: "17:00:00"
+ *     responses:
+ *       200:
+ *         description: Schedule updated successfully.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: "Schedule updated successfully."
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: integer
+ *                       example: 5
+ *                     dentist_id:
+ *                       type: integer
+ *                       example: 1
+ *                     date:
+ *                       type: string
+ *                       format: date
+ *                       example: "2025-02-01"
+ *                     start_time:
+ *                       type: string
+ *                       format: time
+ *                       example: "09:00:00"
+ *                     end_time:
+ *                       type: string
+ *                       format: time
+ *                       example: "17:00:00"
+ *       400:
+ *         description: Bad request due to missing fields or invalid input.
+ *       404:
+ *         description: Schedule not found.
+ *       500:
+ *         description: Internal server error.
+ */
